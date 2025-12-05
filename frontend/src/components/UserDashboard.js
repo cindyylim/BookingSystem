@@ -1,5 +1,4 @@
 // UserDashboard.js
-import React from 'react';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Typography from '@mui/material/Typography';
@@ -8,9 +7,8 @@ import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
 import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
-import Divider from '@mui/material/Divider';
 
-const UserDashboard = ({ user, bookings, onCancel, onReschedule, onProfileUpdate }) => {
+const UserDashboard = ({ user, bookings, onCancel, onProfileUpdate }) => {
   return (
     <Box sx={{ maxWidth: 700, mx: 'auto', mt: 4 }}>
       <Card elevation={3} sx={{ mb: 4 }}>
@@ -36,7 +34,7 @@ const UserDashboard = ({ user, bookings, onCancel, onReschedule, onProfileUpdate
             {bookings.upcoming.map(b => (
               <ListItem key={b.id} sx={{ display: 'flex', alignItems: 'center' }} divider>
                 <ListItemText
-                  primary={`${new Date(b.timeSlot.startTime).toLocaleString()} - ${new Date(b.timeSlot.endTime).toLocaleTimeString()}`}
+                  primary={`${new Date(b.startTime).toLocaleString()} - ${new Date(b.endTime).toLocaleTimeString()}`}
                   secondary={`${b.service} @ ${b.location}`}
                 />
                 <Button onClick={() => onCancel(b)} variant="contained" color="secondary">Cancel</Button>
@@ -55,7 +53,7 @@ const UserDashboard = ({ user, bookings, onCancel, onReschedule, onProfileUpdate
             {bookings.history.map(b => (
               <ListItem key={b.id} divider>
                 <ListItemText
-                  primary={`${new Date(b.timeSlot.startTime).toLocaleString()} - ${new Date(b.timeSlot.endTime).toLocaleTimeString()}`}
+                  primary={`${new Date(b.startTime).toLocaleString()} - ${new Date(b.endTime).toLocaleTimeString()}`}
                   secondary={`${b.service} @ ${b.location}`}
                 />
               </ListItem>

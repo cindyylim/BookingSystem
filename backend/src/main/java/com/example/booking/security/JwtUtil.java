@@ -1,51 +1,61 @@
 package com.example.booking.security;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
-import org.springframework.stereotype.Component;
+import io.jsonwebtoken.*;
+import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
-import io.jsonwebtoken.ExpiredJwtException;
+import org.springframework.stereotype.Component;
 
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
 @Component
 public class JwtUtil {
 
     @Value("${jwt.secret}")
-    private String SECRET;
+    private String secretString;
 
-    private final long EXPIRATION = 1000 * 60 * 60 * 24; // 24 hours
+    private final long EXPIRATION_TIME = 1000 * 60 * 60; // 1 hour
+
+    private SecretKey getSigningKey() {
+        // Ensure the secret is converted to bytes correctly
+        byte[] keyBytes = secretString.getBytes(StandardCharsets.UTF_8);
+        return Keys.hmacShaKeyFor(keyBytes);
+    }
 
     public String generateToken(String username) {
         return Jwts.builder()
                 .setSubject(username)
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION))
-                .signWith(SignatureAlgorithm.HS512, SECRET)
+                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
+                .signWith(getSigningKey(), SignatureAlgorithm.HS512)
                 .compact();
     }
 
     public String extractUsername(String token) {
-        return getClaims(token).getSubject();
+        try {
+            return Jwts.parserBuilder()
+                    .setSigningKey(getSigningKey())
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody()
+                    .getSubject();
+        } catch (JwtException | IllegalArgumentException e) {
+            // Returns null if the token is malformed, expired, or invalid
+            return null;
+        }
     }
 
     public boolean validateToken(String token) {
         try {
-            Claims claims = getClaims(token);
-            return !claims.getExpiration().before(new Date());
-        } catch (ExpiredJwtException e) {
-            System.out.println("Token expired");
-        } catch (Exception e) {
-            System.out.println("Invalid token");
+            Jwts.parserBuilder()
+                    .setSigningKey(getSigningKey())
+                    .build()
+                    .parseClaimsJws(token);
+            return true;
+        } catch (JwtException | IllegalArgumentException e) {
+            // This is where 'MalformedJwt' is caught and turned into a simple 'false'
+            return false;
         }
-        return false;
-    }
-
-    private Claims getClaims(String token) {
-        return Jwts.parser()
-                .setSigningKey(SECRET)
-                .parseClaimsJws(token)
-                .getBody();
     }
 }

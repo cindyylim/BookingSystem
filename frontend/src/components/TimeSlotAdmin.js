@@ -1,8 +1,12 @@
 // TimeSlotAdmin.js
 // Admin interface to create and delete time slots.
 import React, { useEffect, useState, useCallback } from 'react';
+import {
+  Card, CardContent, Typography, TextField, Button,
+  List, ListItem, ListItemText, Box, Grid, Chip, Divider, Alert
+} from '@mui/material';
 
-function TimeSlotAdmin({ credentials }) {
+function TimeSlotAdmin() {
   const [timeSlots, setTimeSlots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [startTime, setStartTime] = useState('');
@@ -10,15 +14,14 @@ function TimeSlotAdmin({ credentials }) {
   const [error, setError] = useState('');
 
   const fetchTimeSlots = useCallback(() => {
-    fetch('/api/timeslots', {
-      headers: credentials ? { 'Authorization': 'Basic ' + btoa(credentials.username + ':' + credentials.password) } : {}
-    })
+    fetch('/api/timeslots')
       .then(res => res.json())
       .then(data => {
         setTimeSlots(data);
         setLoading(false);
       });
-  }, [credentials]);
+
+  }, []);
 
   useEffect(() => {
     fetchTimeSlots();
@@ -54,42 +57,122 @@ function TimeSlotAdmin({ credentials }) {
 
   const handleDelete = async (id) => {
     await fetch(`/api/timeslots/${id}`, {
-      method: 'DELETE',
-      headers: credentials
-        ? { 'Authorization': 'Basic ' + btoa(credentials.username + ':' + credentials.password) }
-        : {}
+      method: 'DELETE'
     });
     fetchTimeSlots();
   };
+
   return (
-    <div>
-      <h2>Admin: Manage Time Slots</h2>
-      <form onSubmit={handleCreate} style={{marginBottom: 20}}>
-        <div>
-          <label>Start Time: <input type="datetime-local" value={startTime} onChange={e => setStartTime(e.target.value)} required /></label>
-        </div>
-        <div>
-          <label>End Time: <input type="datetime-local" value={endTime} onChange={e => setEndTime(e.target.value)} required /></label>
-        </div>
-        <button type="submit">Create Time Slot</button>
-        {error && <div style={{color:'red'}}>{error}</div>}
-      </form>
-      {loading ? <div>Loading time slots...</div> : (
-        <ul>
-          {timeSlots.map(ts => (
-            <li key={ts.id}>
-              {new Date(ts.startTime).toLocaleString()} - {new Date(ts.endTime).toLocaleString()} (Available: {ts.available ? 'Yes' : 'No'})
-              {ts.appointments.map((appointment, index) => (
-                <div key={index}>
-                  Name: {appointment.clientName}, Email: {appointment.clientEmail}, Phone: {appointment.clientPhone}, Service: {appointment.service} @ {appointment.location}
+    <Box>
+      <Typography variant="h4" gutterBottom>Manage Time Slots</Typography>
+
+      <Card elevation={3} sx={{ mb: 4 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>Create New Slot</Typography>
+          <Box component="form" onSubmit={handleCreate}>
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} sm={5}>
+                <TextField
+                  label="Start Time"
+                  type="datetime-local"
+                  value={startTime}
+                  onChange={e => setStartTime(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  fullWidth
+                  required
+                />
+              </Grid>
+              <Grid item xs={12} sm={5}>
+                <TextField
+                  label="End Time"
+                  type="datetime-local"
+                  value={endTime}
+                  onChange={e => setEndTime(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  fullWidth
+                  required
+                />
+              </Grid>
+              <Grid item xs={12} sm={2}>
+                <Button type="submit" variant="contained" color="primary" fullWidth sx={{ height: '56px' }}>
+                  Create
+                </Button>
+              </Grid>
+            </Grid>
+            {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+          </Box>
+        </CardContent>
+      </Card>
+
+      {loading ? <Typography>Loading time slots...</Typography> : (
+        <Card elevation={3}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>Existing Slots</Typography>
+            <List>
+              {timeSlots.map((ts, idx) => (
+                <div key={ts.id}>
+                  {idx > 0 && <Divider component="li" />}
+                  <ListItem
+                    secondaryAction={
+                      ts.available && (!ts.appointments || ts.appointments.length === 0) && (
+                        <Button
+                          variant="contained"
+                          color="error"
+                          onClick={() => handleDelete(ts.id)}
+                        >
+                          Delete
+                        </Button>
+                      )
+                    }
+                    alignItems="flex-start"
+                  >
+                    <ListItemText
+                      primary={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography variant="subtitle1" component="span">
+                            {new Date(ts.startTime).toLocaleString()} - {new Date(ts.endTime).toLocaleTimeString()}
+                          </Typography>
+                          <Chip
+                            label={ts.available ? "Available" : "Booked"}
+                            color={ts.available ? "success" : "default"}
+                            size="small"
+                            variant={ts.available ? "filled" : "outlined"}
+                          />
+                        </Box>
+                      }
+                      primaryTypographyProps={{ component: 'div' }}
+                      secondary={
+                        ts.appointments && ts.appointments.length > 0 ? (
+                          <Box sx={{ mt: 1 }}>
+                            {ts.appointments.map((appt, i) => (
+                              <Box key={i} sx={{ p: 1, bgcolor: '#f0f4f8', borderRadius: 1, mt: 1 }}>
+                                <Typography variant="body2" color="text.primary" fontWeight="600">
+                                  {appt.clientName}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Email: {appt.clientEmail}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Phone: {appt.clientPhone}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" display="block">
+                                  Service: {appt.service} | Location: {appt.location}
+                                </Typography>
+                              </Box>
+                            ))}
+                          </Box>
+                        ) : "No appointments"
+                      }
+                      secondaryTypographyProps={{ component: 'div' }}
+                    />
+                  </ListItem>
                 </div>
               ))}
-              <button style={{marginLeft: 10}} onClick={() => handleDelete(ts.id)}>Delete</button>
-            </li>
-          ))}
-        </ul>
+            </List>
+          </CardContent>
+        </Card>
       )}
-    </div>
+    </Box>
   );
 }
 

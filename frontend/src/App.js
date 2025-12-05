@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import AppBar from '@mui/material/AppBar';
@@ -7,6 +7,13 @@ import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import Container from '@mui/material/Container';
 import Box from '@mui/material/Box';
+import Grid from '@mui/material/Grid';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import StarIcon from '@mui/icons-material/Star';
+
 import BookingSuccess from './components/BookingSuccess';
 import Auth from './components/Auth';
 import UserDashboard from './components/UserDashboard';
@@ -22,6 +29,18 @@ const theme = createTheme({
     background: { default: '#f8fafc' },
   },
   shape: { borderRadius: 12 },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        root: { textTransform: 'none', fontWeight: 600 },
+      },
+    },
+  },
+  typography: {
+    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+    h3: { fontWeight: 700 },
+    h5: { fontWeight: 600 },
+  },
 });
 
 function App() {
@@ -36,6 +55,42 @@ function App() {
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [adminError, setAdminError] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
+
+  // Define fetchUserBookings early so it can be used in useEffect
+  const fetchUserBookings = async () => {
+    const res = await fetch('/api/user/appointments');
+    if (res.ok) {
+      const data = await res.json();
+      setUserBookings(data);
+    }
+  };
+
+  useEffect(() => {
+    // Check for existing session
+    fetch('/api/auth/me')
+      .then(res => {
+        if (res.ok) return res.json();
+        throw new Error('Not authenticated');
+      })
+      .then(user => {
+        setUser(user);
+        // Fetch bookings for restored user session
+        if (user && user.role !== 'ADMIN') {
+          fetchUserBookings();
+        }
+      })
+      .catch(() => {
+        // Not logged in
+        setUser(null);
+      });
+  }, []);
+
+  // Fetch bookings when dashboard is shown
+  useEffect(() => {
+    if (showDashboard && user && user.role !== 'ADMIN') {
+      fetchUserBookings();
+    }
+  }, [showDashboard, user]);
 
   const handleBook = (timeSlot) => {
     setSelectedTimeSlot(timeSlot);
@@ -61,10 +116,8 @@ function App() {
   };
 
   const handleCancelBooking = async (appt) => {
-    const token = localStorage.getItem('jwt');
     await fetch(`/api/appointments/cancel/${appt.cancellationToken}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': 'Bearer ' + token }
+      method: 'DELETE'
     });
     fetchUserBookings();
   };
@@ -75,21 +128,20 @@ function App() {
     fetchUserBookings();
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
     setUser(null);
-    localStorage.removeItem('jwt');
     setShowDashboard(false);
   };
 
   const handleProfileUpdate = async (e) => {
     e.preventDefault();
-    const token = localStorage.getItem('jwt');
     const form = e.target;
     const email = form.email.value;
     const phone = form.phone.value;
     await fetch('/api/user/profile', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, phone })
     });
     fetchUserBookings();
@@ -100,84 +152,125 @@ function App() {
     setLastAppointment(null);
     setSelectedTimeSlot(null);
     setShowDashboard(false);
+    setGuestMode(false);
   };
 
   const handleAdminLogin = (userObj) => {
-    setUser(userObj);
-    setShowDashboard(false);
-    setShowAdminLogin(false);
-    setAdminError(null);
-    setIsAdmin(true);
-    // fetchUserBookings(); // Only if admin should see user dashboard
+    if (userObj.role === 'ADMIN') {
+      setUser(userObj);
+      setShowDashboard(false);
+      setShowAdminLogin(false);
+      setAdminError(null);
+      setIsAdmin(true);
+    } else {
+      setAdminError('Access denied. Admin privileges required.');
+    }
   };
 
-  const handleAdminLogout = () => {
+  const handleAdminLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
     setIsAdmin(false);
     setShowAdminLogin(false);
     setUser(null);
   };
 
-  const fetchUserBookings = async () => {
-    const token = localStorage.getItem('jwt');
-    if (!token) return;
-    const res = await fetch('/api/user/appointments', {
-      headers: { 'Authorization': 'Bearer ' + token }
-    });
-    if (res.ok) {
-      setUserBookings(await res.json());
-    }
-  };
-
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <AppBar position="static" color="primary" elevation={1}>
+      <AppBar position="static" color="primary" elevation={0} sx={{ borderBottom: '1px solid rgba(0,0,0,0.1)' }}>
         <Toolbar>
+          <CalendarMonthIcon sx={{ mr: 2 }} />
           <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 700 }}>
-            Salon Booking System
+            Salon Booking
           </Typography>
-          <Button color="inherit" onClick={() => setShowAdminLogin(true)} sx={{ fontWeight: 600 }}>Admin Login</Button>
+          <Button color="inherit" onClick={() => setShowAdminLogin(true)}>Admin</Button>
         </Toolbar>
       </AppBar>
       {showAdminLogin && (
-        <Box sx={{ background: '#fff', border: '1px solid #ccc', p: 3, position: 'absolute', top: 80, right: 40, zIndex: 1000, borderRadius: 2 }}>
+        <Box sx={{ background: '#fff', border: '1px solid #ccc', p: 3, position: 'absolute', top: 70, right: 20, zIndex: 1200, borderRadius: 2, boxShadow: 3 }}>
           <AdminLogin onLogin={handleAdminLogin} error={adminError} />
-          <Button onClick={() => setShowAdminLogin(false)} sx={{ mt: 2 }}>Close</Button>
+          <Button onClick={() => setShowAdminLogin(false)} sx={{ mt: 2 }} fullWidth>Close</Button>
         </Box>
       )}
-      <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-        {/* Hero Section */}
-        {!user && !isAdmin && !bookingSuccess && !selectedTimeSlot && !showDashboard && (
-          <Box sx={{ textAlign: 'center', py: 6 }}>
-            <Typography variant="h3" sx={{ fontWeight: 700, mb: 2 }}>
+
+      {/* Hero Section */}
+      {!user && !isAdmin && !bookingSuccess && !selectedTimeSlot && !showDashboard && !guestMode && (
+        <Box sx={{
+          background: 'linear-gradient(135deg, #1976d2 0%, #0d47a1 100%)',
+          color: 'white',
+          py: 8,
+          textAlign: 'center',
+          mb: 6
+        }}>
+          <Container maxWidth="md">
+            <Typography variant="h3" sx={{ mb: 2 }}>
               Effortless Salon Scheduling
             </Typography>
-            <Typography variant="h6" sx={{ color: 'text.secondary', mb: 4 }}>
-              Book appointments, manage your schedule, and grow your business with our modern, easy-to-use platform.
+            <Typography variant="h6" sx={{ mb: 4, opacity: 0.9 }}>
+              Book appointments, manage your schedule, and grow your business with our modern platform.
             </Typography>
-            <Button variant="contained" size="large" color="primary" onClick={() => setGuestMode(true)} sx={{ borderRadius: 8, px: 4, py: 1.5, fontWeight: 600 }}>
+            <Button
+              variant="contained"
+              size="large"
+              color="secondary"
+              onClick={() => setGuestMode(true)}
+              sx={{ borderRadius: 8, px: 6, py: 1.5, fontSize: '1.1rem', boxShadow: 3 }}
+            >
               Book Now
             </Button>
-          </Box>
+          </Container>
+        </Box>
+      )}
+
+      <Container maxWidth="lg" sx={{ mb: 8 }}>
+
+        {/* Features Section (Only on landing) */}
+        {!user && !isAdmin && !bookingSuccess && !selectedTimeSlot && !showDashboard && !guestMode && (
+          <Grid container spacing={4} sx={{ mb: 6 }}>
+            {[
+              { icon: <CalendarMonthIcon fontSize="large" color="primary" />, title: "Easy Booking", desc: "Select a time slot that works for you in seconds." },
+              { icon: <AccessTimeIcon fontSize="large" color="primary" />, title: "24/7 Access", desc: "Book your appointments anytime, anywhere." },
+              { icon: <StarIcon fontSize="large" color="primary" />, title: "Premium Service", desc: "Experience the best salon services in town." }
+            ].map((feature, idx) => (
+              <Grid item xs={12} md={4} key={idx}>
+                <Card elevation={2} sx={{ height: '100%', textAlign: 'center', p: 2 }}>
+                  <CardContent>
+                    <Box sx={{ mb: 2 }}>{feature.icon}</Box>
+                    <Typography variant="h6" gutterBottom>{feature.title}</Typography>
+                    <Typography variant="body2" color="text.secondary">{feature.desc}</Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
         )}
+
         {/* Admin View */}
         {isAdmin && (
           <Box sx={{ mt: 4 }}>
-            <Button onClick={handleAdminLogout} variant="outlined" color="secondary" sx={{ mb: 2 }}>Admin Logout</Button>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+              <Typography variant="h4" color="primary">Admin Dashboard</Typography>
+              <Button onClick={handleAdminLogout} variant="outlined" color="error">Logout</Button>
+            </Box>
             <TimeSlotAdmin />
           </Box>
         )}
-        {/* User/Guest/Dashboard Logic (rest of your app) */}
+
+        {/* User/Guest/Dashboard Logic */}
         {!isAdmin && (
           user ? (
-            <>
-              <Button onClick={() => setShowDashboard(!showDashboard)} variant="outlined" sx={{ mr: 2, mb: 2 }}>
-                {showDashboard ? 'Back to Booking' : 'Dashboard'}
-              </Button>
-              <Button onClick={handleLogout} variant="outlined" color="secondary" sx={{ mb: 2 }}>Logout</Button>
-            </>
+            <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="h5">Welcome, {user.username}</Typography>
+              <Box>
+                <Button onClick={() => setShowDashboard(!showDashboard)} variant="contained" sx={{ mr: 2 }}>
+                  {showDashboard ? 'Book Appointment' : 'My Dashboard'}
+                </Button>
+                <Button onClick={handleLogout} variant="outlined" color="error">Logout</Button>
+              </Box>
+            </Box>
           ) : null
         )}
+
         {!isAdmin && showDashboard && user ? (
           <UserDashboard
             user={user}
@@ -190,8 +283,6 @@ function App() {
         ) : bookingSuccess && lastAppointment ? (
           <BookingSuccess
             appointment={lastAppointment}
-            onModify={handleModify}
-            onCancel={handleCancelBooking}
             onBackToBooking={handleBackToBooking}
           />
         ) : selectedTimeSlot ? (
@@ -200,9 +291,14 @@ function App() {
             onBooked={appointment => handleBooked(appointment)}
             onCancel={handleCancel}
           />
-        ) : (!isAdmin && (
-          <TimeSlotList onBook={handleBook} key={refresh} />
-        ))}
+        ) : (guestMode || user) && !isAdmin ? (
+          <Box>
+            {guestMode && !user && (
+              <Button onClick={() => setGuestMode(false)} sx={{ mb: 2 }}>&larr; Back to Home</Button>
+            )}
+            <TimeSlotList onBook={handleBook} key={refresh} />
+          </Box>
+        ) : null}
       </Container>
     </ThemeProvider>
   );

@@ -5,9 +5,7 @@ import com.example.booking.service.TimeSlotService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.time.OffsetDateTime;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import java.time.Instant;
 import java.util.List;
@@ -38,15 +36,15 @@ public class TimeSlotController {
     @GetMapping
     public List<TimeSlotDTO> getAllTimeSlots() {
         List<TimeSlotDTO> dtos = timeSlotRepository.findAll().stream()
-            .map(TimeSlotMapper::toDTO)
-            .collect(Collectors.toList());
+                .map(TimeSlotMapper::toDTO)
+                .collect(Collectors.toList());
         return dtos;
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<TimeSlotDTO> getTimeSlot(@PathVariable Long id) {
         TimeSlot timeSlot = timeSlotRepository.findById(id)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "TimeSlot not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "TimeSlot not found"));
 
         TimeSlotDTO dto = TimeSlotMapper.toDTO(timeSlot);
         return ResponseEntity.ok(dto);
@@ -68,7 +66,7 @@ public class TimeSlotController {
         return ResponseEntity.ok(timeSlotService.createTimeSlot(timeSlot));
     }
 
-    @PutMapping("/{id}")
+    @PutMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> updateTimeSlot(@PathVariable Long id, @RequestBody TimeSlot timeSlot) {
         timeSlotService.validateTimeSlot(timeSlot);
 
@@ -98,7 +96,8 @@ public class TimeSlotController {
         private String endTime;
         private boolean available;
 
-        public TimeSlotRequest() {}
+        public TimeSlotRequest() {
+        }
 
         public String getStartTime() {
             return startTime;

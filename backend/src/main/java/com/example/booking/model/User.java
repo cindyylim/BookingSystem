@@ -2,7 +2,7 @@ package com.example.booking.model;
 
 import jakarta.persistence.*;
 import java.util.List;
-import com.fasterxml.jackson.annotation.JsonManagedReference;  
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 
 @Entity
 @Table(name = "users")
@@ -17,21 +17,67 @@ public class User {
     @Column(unique = true, nullable = false)
     private String email;
     private String phone;
+    @Column(nullable = false)
+    private String role = "USER"; // USER or ADMIN
 
     @OneToMany(mappedBy = "user")
-    @JsonManagedReference
+    @JsonManagedReference("user-appointments")
     private List<Appointment> appointments;
+
     // Getters and setters
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public String getUsername() { return username; }
-    public void setUsername(String username) { this.username = username; }
-    public String getPassword() { return password; }
-    public void setPassword(String password) { this.password = password; }
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
-    public String getPhone() { return phone; }
-    public void setPhone(String phone) { this.phone = phone; }
-    public List<Appointment> getAppointments() { return appointments; }
-    public void setAppointments(List<Appointment> appointments) { this.appointments = appointments; }
-} 
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
+    }
+
+    public List<Appointment> getAppointments() {
+        return appointments;
+    }
+
+    public void setAppointments(List<Appointment> appointments) {
+        this.appointments = appointments;
+    }
+}
