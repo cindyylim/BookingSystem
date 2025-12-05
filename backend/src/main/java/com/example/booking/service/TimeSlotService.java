@@ -19,6 +19,10 @@ public class TimeSlotService {
         return timeSlotRepository.findAll();
     }
 
+    public List<TimeSlot> getAvailableTimeSlots() {
+        return timeSlotRepository.findByAvailableTrue();
+    }
+
     public Optional<TimeSlot> getTimeSlot(Long id) {
         return timeSlotRepository.findById(id);
     }
@@ -38,6 +42,7 @@ public class TimeSlotService {
 
         timeSlotRepository.deleteById(id);
     }
+
     public TimeSlot createTimeSlot(TimeSlot timeSlot) {
         validateTimeSlot(timeSlot);
         checkForConflicts(timeSlot, null); // null for new creation
@@ -65,41 +70,33 @@ public class TimeSlotService {
     }
 
     private void checkForConflicts(TimeSlot newSlot, Long excludeId) {
-        List<TimeSlot> allSlots = timeSlotRepository.findAll();
+        List<TimeSlot> conflicts;
+        if (excludeId == null) {
+            conflicts = timeSlotRepository.findOverlappingSlots(newSlot.getStartTime(), newSlot.getEndTime());
+        } else {
+            conflicts = timeSlotRepository.findOverlappingSlotsExcluding(newSlot.getStartTime(), newSlot.getEndTime(),
+                    excludeId);
+        }
 
-        for (TimeSlot existing : allSlots) {
-            if (excludeId != null && existing.getId().equals(excludeId)) {
-                continue; // Skip self when updating
-            }
-
-            boolean overlaps = newSlot.getStartTime().isBefore(existing.getEndTime())
-                    && newSlot.getEndTime().isAfter(existing.getStartTime());
-
-            if (overlaps) {
-                throw new IllegalArgumentException("Time slot overlaps with an existing slot.");
-            }
+        if (!conflicts.isEmpty()) {
+            throw new IllegalArgumentException("Time slot overlaps with an existing slot.");
         }
     }
+
     public boolean isOverlapping(TimeSlot newSlot) {
-        return timeSlotRepository.findAll().stream().anyMatch(existing ->
-            existing.getId() != null &&
-            newSlot.getStartTime().isBefore(existing.getEndTime()) &&
-            newSlot.getEndTime().isAfter(existing.getStartTime())
-        );
+        return !timeSlotRepository.findOverlappingSlots(newSlot.getStartTime(), newSlot.getEndTime()).isEmpty();
     }
 
     public boolean isOverlapping(TimeSlot updatedSlot, Long excludeId) {
-        return timeSlotRepository.findAll().stream().anyMatch(existing ->
-            !existing.getId().equals(excludeId) &&
-            updatedSlot.getStartTime().isBefore(existing.getEndTime()) &&
-            updatedSlot.getEndTime().isAfter(existing.getStartTime())
-        );
+        return !timeSlotRepository
+                .findOverlappingSlotsExcluding(updatedSlot.getStartTime(), updatedSlot.getEndTime(), excludeId)
+                .isEmpty();
     }
 
     public boolean isBooked(Long id) {
         return timeSlotRepository.findById(id)
-            .map(slot -> !slot.isAvailable())
-            .orElse(false);
+                .map(slot -> !slot.isAvailable())
+                .orElse(false);
     }
 
-} 
+}

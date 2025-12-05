@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.security.core.Authentication;
 import com.example.booking.model.User;
-import com.example.booking.repository.UserRepository;
+import com.example.booking.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 
 @RestController
@@ -20,7 +20,7 @@ public class AppointmentController {
     private final AppointmentService appointmentService;
 
     @Autowired
-    private UserRepository userRepository;
+    private UserService userService;
 
     public AppointmentController(AppointmentService appointmentService) {
         this.appointmentService = appointmentService;
@@ -38,7 +38,8 @@ public class AppointmentController {
     }
 
     @PostMapping
-    public ResponseEntity<Appointment> bookAppointment(@RequestBody AppointmentRequest request, Authentication authentication) {
+    public ResponseEntity<Appointment> bookAppointment(@RequestBody AppointmentRequest request,
+            Authentication authentication) {
         try {
             Appointment appointment = new Appointment();
             appointment.setCustomerName(request.getCustomerName());
@@ -48,11 +49,12 @@ public class AppointmentController {
             appointment.setService(request.getService());
             User user = null;
             if (authentication != null && authentication.isAuthenticated()) {
-                user = userRepository.findByUsername(authentication.getName()).orElse(null);
+                user = userService.getUserByUsername(authentication.getName()).orElse(null);
             }
             Appointment booked = appointmentService.bookAppointment(appointment, request.getTimeSlotId(), user);
             return ResponseEntity.ok(booked);
         } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.badRequest().build();
         }
     }
@@ -63,7 +65,7 @@ public class AppointmentController {
         return ResponseEntity.noContent().build();
     }
 
-    @RequestMapping(value = "/cancel/{token}", method = {RequestMethod.GET, RequestMethod.DELETE})
+    @RequestMapping(value = "/cancel/{token}", method = { RequestMethod.GET, RequestMethod.DELETE })
     public ResponseEntity<String> cancelAppointmentByToken(@PathVariable String token) {
         boolean cancelled = appointmentService.cancelAppointmentByToken(token);
         if (cancelled) {
@@ -81,17 +83,53 @@ public class AppointmentController {
         private Long timeSlotId;
         private String location;
         private String service;
-        public String getCustomerName() { return customerName; }
-        public void setCustomerName(String customerName) { this.customerName = customerName; }
-        public String getCustomerEmail() { return customerEmail; }
-        public void setCustomerEmail(String customerEmail) { this.customerEmail = customerEmail; }
-        public String getCustomerPhone() { return customerPhone; }
-        public void setCustomerPhone(String customerPhone) { this.customerPhone = customerPhone; }
-        public Long getTimeSlotId() { return timeSlotId; }
-        public void setTimeSlotId(Long timeSlotId) { this.timeSlotId = timeSlotId; }
-        public String getLocation() { return location; }
-        public void setLocation(String location) { this.location = location; }
-        public String getService() { return service; }
-        public void setService(String service) { this.service = service; }
+
+        public String getCustomerName() {
+            return customerName;
+        }
+
+        public void setCustomerName(String customerName) {
+            this.customerName = customerName;
+        }
+
+        public String getCustomerEmail() {
+            return customerEmail;
+        }
+
+        public void setCustomerEmail(String customerEmail) {
+            this.customerEmail = customerEmail;
+        }
+
+        public String getCustomerPhone() {
+            return customerPhone;
+        }
+
+        public void setCustomerPhone(String customerPhone) {
+            this.customerPhone = customerPhone;
+        }
+
+        public Long getTimeSlotId() {
+            return timeSlotId;
+        }
+
+        public void setTimeSlotId(Long timeSlotId) {
+            this.timeSlotId = timeSlotId;
+        }
+
+        public String getLocation() {
+            return location;
+        }
+
+        public void setLocation(String location) {
+            this.location = location;
+        }
+
+        public String getService() {
+            return service;
+        }
+
+        public void setService(String service) {
+            this.service = service;
+        }
     }
-} 
+}

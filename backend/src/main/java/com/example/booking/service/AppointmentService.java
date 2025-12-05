@@ -23,7 +23,8 @@ public class AppointmentService {
     private final TimeSlotRepository timeSlotRepository;
     private final JavaMailSender mailSender;
 
-    public AppointmentService(AppointmentRepository appointmentRepository, TimeSlotRepository timeSlotRepository, JavaMailSender mailSender) {
+    public AppointmentService(AppointmentRepository appointmentRepository, TimeSlotRepository timeSlotRepository,
+            JavaMailSender mailSender) {
         this.appointmentRepository = appointmentRepository;
         this.timeSlotRepository = timeSlotRepository;
         this.mailSender = mailSender;
@@ -33,26 +34,42 @@ public class AppointmentService {
         return appointmentRepository.findAll();
     }
 
+    public List<Appointment> getAppointmentsForUser(Long userId) {
+        return appointmentRepository.findByUserId(userId);
+    }
+
     public Optional<Appointment> getAppointment(Long id) {
         return appointmentRepository.findById(id);
     }
 
     @Transactional
     public Appointment bookAppointment(Appointment appointment, Long timeSlotId, User user) {
-        TimeSlot timeSlot = timeSlotRepository.findById(timeSlotId).orElseThrow();
-        if (!timeSlot.isAvailable()) {
+        // Atomic check-and-set: mark as unavailable only if currently available
+        // This UPDATE query is atomic at the database level, preventing race conditions
+        int updated = timeSlotRepository.markAsUnavailableIfAvailable(timeSlotId);
+
+        if (updated == 0) {
+            // Either slot doesn't exist or is already booked
+            // Check if slot exists to provide accurate error message
+            if (!timeSlotRepository.existsById(timeSlotId)) {
+                throw new IllegalArgumentException("Time slot not found");
+            }
             throw new IllegalStateException("Time slot is not available");
         }
-        timeSlot.setAvailable(false);
-        timeSlotRepository.save(timeSlot);
+
+        // Slot is now reserved for this booking, complete the appointment
+        TimeSlot timeSlot = timeSlotRepository.findById(timeSlotId).orElseThrow();
         appointment.setTimeSlot(timeSlot);
+
         if (user != null) {
             appointment.setUser(user);
         }
+
         // Generate cancellation token
         String token = UUID.randomUUID().toString();
         appointment.setCancellationToken(token);
         Appointment saved = appointmentRepository.save(appointment);
+
         // Send email
         sendAppointmentEmail(saved);
         return saved;
@@ -63,12 +80,11 @@ public class AppointmentService {
         String subject = "Appointment Confirmation & Cancellation Link";
         String cancelUrl = "http://localhost:8080/api/appointments/cancel/" + appointment.getCancellationToken();
         String text = String.format(
-            "Dear %s,\n\nYour appointment is confirmed for %s - %s.\n\nIf you wish to cancel, click here: %s\n\nThank you!",
-            appointment.getCustomerName(),
-            Date.from(appointment.getTimeSlot().getStartTime().toInstant()).toLocaleString(),
-            Date.from(appointment.getTimeSlot().getEndTime().toInstant()).toLocaleString(),
-            cancelUrl
-        );
+                "Dear %s,\n\nYour appointment is confirmed for %s - %s.\n\nIf you wish to cancel, click here: %s\n\nThank you!",
+                appointment.getCustomerName(),
+                Date.from(appointment.getTimeSlot().getStartTime().toInstant()).toLocaleString(),
+                Date.from(appointment.getTimeSlot().getEndTime().toInstant()).toLocaleString(),
+                cancelUrl);
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true);
@@ -94,7 +110,8 @@ public class AppointmentService {
 
     public boolean cancelAppointmentByToken(String token) {
         Appointment appointment = appointmentRepository.findByCancellationToken(token);
-        if (appointment == null) return false;
+        if (appointment == null)
+            return false;
         TimeSlot slot = appointment.getTimeSlot();
         if (slot != null) {
             slot.setAvailable(true);
@@ -103,4 +120,4 @@ public class AppointmentService {
         appointmentRepository.delete(appointment); // This deletes the row
         return true;
     }
-} 
+}
