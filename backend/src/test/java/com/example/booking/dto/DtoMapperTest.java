@@ -66,6 +66,11 @@ public class DtoMapperTest {
 
         assertEquals(ts.getId(), dto.getId());
         assertEquals(ts.getStartTime(), dto.getStartTime());
+<<<<<<< HEAD
+=======
+        assertEquals(ts.getEndTime(), dto.getEndTime());
+        assertEquals(ts.isAvailable(), dto.isAvailable());
+>>>>>>> d4766c3 (Add tests, indexes, and ensure strong consistency when booking)
         assertEquals(1, dto.getAppointments().size());
         assertEquals("Jane", dto.getAppointments().get(0).getClientName());
     }

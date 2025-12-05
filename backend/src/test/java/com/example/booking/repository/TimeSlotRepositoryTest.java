@@ -9,6 +9,10 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+<<<<<<< HEAD
+=======
+import com.example.booking.model.Appointment;
+>>>>>>> d4766c3 (Add tests, indexes, and ensure strong consistency when booking)
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -23,6 +27,12 @@ public class TimeSlotRepositoryTest {
     @Autowired
     private TimeSlotRepository timeSlotRepository;
 
+<<<<<<< HEAD
+=======
+    @Autowired
+    private AppointmentRepository appointmentRepository;
+
+>>>>>>> d4766c3 (Add tests, indexes, and ensure strong consistency when booking)
     private TimeSlot testSlot;
 
     @BeforeEach
@@ -257,4 +267,38 @@ public class TimeSlotRepositoryTest {
         );
         assertEquals(1, otherOverlap.size());
     }
+<<<<<<< HEAD
+=======
+
+    @Test
+    void testFindByTime() {
+        TimeSlot slot1 = new TimeSlot();
+        OffsetDateTime startTime = OffsetDateTime.now().plusDays(1).withHour(10).withMinute(0);
+        OffsetDateTime endTime = OffsetDateTime.now().plusDays(1).withHour(11).withMinute(0);
+        slot1.setStartTime(startTime);
+        slot1.setEndTime(endTime);
+        timeSlotRepository.save(slot1);
+
+        TimeSlot ts = timeSlotRepository.findByTime(startTime, endTime);
+        assertEquals(slot1.getId(), ts.getId());
+    }
+
+    @Test
+    void testFindAppointmentsByTimeSlotId() {
+        TimeSlot slot1 = new TimeSlot();
+        OffsetDateTime startTime = OffsetDateTime.now().plusDays(1).withHour(10).withMinute(0);
+        OffsetDateTime endTime = OffsetDateTime.now().plusDays(1).withHour(11).withMinute(0);
+        slot1.setStartTime(startTime);
+        slot1.setEndTime(endTime);
+        timeSlotRepository.save(slot1);
+
+        Appointment appointment = new Appointment();
+        appointment.setTimeSlot(slot1);
+        appointmentRepository.save(appointment);
+
+        List<Appointment> appointments = timeSlotRepository.findAppointmentsByTimeSlotId(slot1.getId());
+        assertEquals(1, appointments.size());
+        assertEquals(appointment.getId(), appointments.get(0).getId());
+    }
+>>>>>>> d4766c3 (Add tests, indexes, and ensure strong consistency when booking)
 }
