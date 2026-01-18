@@ -107,13 +107,6 @@ function App() {
     setSelectedTimeSlot(null);
   };
 
-  const handleModify = () => {
-    setBookingSuccess(false);
-    setSelectedTimeSlot({
-      ...lastAppointment.timeSlot,
-      previousAppointment: lastAppointment
-    });
-  };
 
   const handleCancelBooking = async (appt) => {
     await fetch(`/api/appointments/cancel/${appt.cancellationToken}`, {
@@ -209,14 +202,17 @@ function App() {
             <Typography variant="h6" sx={{ mb: 4, opacity: 0.9 }}>
               Book appointments, manage your schedule, and grow your business with our modern platform.
             </Typography>
+            <Typography variant="body1" sx={{ mb: 4, opacity: 0.9 }}>
+              Please login or register to book an appointment.
+            </Typography>
             <Button
               variant="contained"
               size="large"
               color="secondary"
-              onClick={() => setGuestMode(true)}
+              onClick={() => setShowDashboard(true)}
               sx={{ borderRadius: 8, px: 6, py: 1.5, fontSize: '1.1rem', boxShadow: 3 }}
             >
-              Book Now
+              Login / Register
             </Button>
           </Container>
         </Box>
@@ -278,7 +274,7 @@ function App() {
             onCancel={handleCancelBooking}
             onProfileUpdate={handleProfileUpdate}
           />
-        ) : !user && !bookingSuccess && !selectedTimeSlot && !guestMode && !isAdmin ? (
+        ) : !user && !bookingSuccess && !selectedTimeSlot && !isAdmin && showDashboard ? (
           <Auth onAuth={handleAuth} />
         ) : bookingSuccess && lastAppointment ? (
           <BookingSuccess
@@ -290,12 +286,10 @@ function App() {
             timeSlot={selectedTimeSlot}
             onBooked={appointment => handleBooked(appointment)}
             onCancel={handleCancel}
+            user={user}
           />
-        ) : (guestMode || user) && !isAdmin ? (
+        ) : user && !isAdmin ? (
           <Box>
-            {guestMode && !user && (
-              <Button onClick={() => setGuestMode(false)} sx={{ mb: 2 }}>&larr; Back to Home</Button>
-            )}
             <TimeSlotList onBook={handleBook} key={refresh} />
           </Box>
         ) : null}

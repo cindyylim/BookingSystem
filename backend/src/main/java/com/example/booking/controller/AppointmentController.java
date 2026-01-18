@@ -41,16 +41,24 @@ public class AppointmentController {
     public ResponseEntity<?> bookAppointment(@RequestBody AppointmentRequest request,
             Authentication authentication) {
         try {
+            // Check if user is authenticated
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(401)
+                        .body(java.util.Map.of("message", "Authentication required to book appointments", "error", "Please login to book an appointment"));
+            }
+            
+            // Get authenticated user
+            User user = userService.getUserByUsername(authentication.getName())
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            
             Appointment appointment = new Appointment();
-            appointment.setCustomerName(request.getCustomerName());
-            appointment.setCustomerEmail(request.getCustomerEmail());
-            appointment.setCustomerPhone(request.getCustomerPhone());
+            // Use authenticated user's information
+            appointment.setCustomerName(user.getUsername());
+            appointment.setCustomerEmail(user.getEmail() != null ? user.getEmail() : request.getCustomerEmail());
+            appointment.setCustomerPhone(user.getPhone() != null ? user.getPhone() : request.getCustomerPhone());
             appointment.setLocation(request.getLocation());
             appointment.setService(request.getService());
-            User user = null;
-            if (authentication != null && authentication.isAuthenticated()) {
-                user = userService.getUserByUsername(authentication.getName()).orElse(null);
-            }
+            
             Appointment booked = appointmentService.bookAppointment(appointment, request.getTimeSlotId(), user);
             return ResponseEntity.ok(booked);
         } catch (IllegalStateException e) {
@@ -58,9 +66,9 @@ public class AppointmentController {
             return ResponseEntity.status(409)
                     .body(java.util.Map.of("message", "Time slot is not available", "error", e.getMessage()));
         } catch (IllegalArgumentException e) {
-            // Time slot not found
+            // Time slot not found or user not found
             return ResponseEntity.status(400)
-                    .body(java.util.Map.of("message", "Time slot not found", "error", e.getMessage()));
+                    .body(java.util.Map.of("message", e.getMessage(), "error", e.getMessage()));
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(500)

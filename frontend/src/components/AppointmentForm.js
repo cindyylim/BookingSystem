@@ -10,11 +10,8 @@ import Typography from '@mui/material/Typography';
 import Grid from '@mui/material/Grid';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 
-function AppointmentForm({ timeSlot, onBooked, onCancel }) {
+function AppointmentForm({ timeSlot, onBooked, onCancel, user }) {
   const prev = timeSlot.previousAppointment || {};
-  const [customerName, setCustomerName] = useState(prev.customerName || '');
-  const [customerEmail, setCustomerEmail] = useState(prev.customerEmail || '');
-  const [customerPhone, setCustomerPhone] = useState(prev.customerPhone || '');
   const [service, setService] = useState(prev.service || '');
   const [location, setLocation] = useState(prev.location || '');
   const [error, setError] = useState('');
@@ -31,9 +28,9 @@ function AppointmentForm({ timeSlot, onBooked, onCancel }) {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        customerName,
-        customerEmail,
-        customerPhone,
+        customerName: user.username,
+        customerEmail: user.email || '',
+        customerPhone: user.phone || '',
         timeSlotId: timeSlot.id,
         service,
         location
@@ -43,7 +40,8 @@ function AppointmentForm({ timeSlot, onBooked, onCancel }) {
       const appointment = await res.json();
       onBooked(appointment);
     } else {
-      setError('Appointment is not available.');
+      const errorData = await res.json();
+      setError(errorData.message || 'Failed to book appointment.');
     }
   };
 
@@ -71,44 +69,17 @@ function AppointmentForm({ timeSlot, onBooked, onCancel }) {
         </Box>
 
         <Box component="form" onSubmit={handleSubmit}>
-          <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>Client Information</Typography>
-          <Grid container spacing={2}>
-            <Grid item xs={12}>
-              <TextField
-                label="Full Name"
-                value={customerName}
-                onChange={e => setCustomerName(e.target.value)}
-                required
-                fullWidth
-                variant="outlined"
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="Email Address"
-                type="email"
-                value={customerEmail}
-                onChange={e => setCustomerEmail(e.target.value)}
-                required
-                fullWidth
-                variant="outlined"
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="Phone Number"
-                type="tel"
-                value={customerPhone}
-                onChange={e => setCustomerPhone(e.target.value)}
-                required
-                fullWidth
-                variant="outlined"
-              />
-            </Grid>
+          <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>User Information</Typography>
+          <Box sx={{ mb: 3, p: 2, bgcolor: 'background.default', borderRadius: 2, border: '1px solid #e0e0e0' }}>
+            <Typography variant="body1"><strong>Name:</strong> {user.username}</Typography>
+            {user.email && <Typography variant="body1"><strong>Email:</strong> {user.email}</Typography>}
+            {user.phone && <Typography variant="body1"><strong>Phone:</strong> {user.phone}</Typography>}
+          </Box>
 
-            <Grid item xs={12} sx={{ mt: 1 }}>
-              <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>Service Details</Typography>
-            </Grid>
+          <Grid item xs={12} sx={{ mt: 1 }}>
+            <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>Service Details</Typography>
+          </Grid>
+          <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
               <TextField
                 label="Service Type"

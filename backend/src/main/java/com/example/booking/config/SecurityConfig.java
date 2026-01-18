@@ -20,7 +20,9 @@ public class SecurityConfig {
             .csrf().disable()
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/api/appointments/**").permitAll() // allow guest booking/cancel
+                .requestMatchers("/api/appointments/cancel/**").permitAll() // allow cancellation by token
+                .requestMatchers("/api/appointments").authenticated() // require authentication for booking
+                .requestMatchers("/api/appointments/**").authenticated() // require authentication for other appointment operations
                 .requestMatchers("/api/user/**").authenticated()
                 .anyRequest().permitAll()
             )
