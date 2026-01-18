@@ -239,10 +239,6 @@ class TimeSlotServiceTest {
         when(timeSlotRepository.findById(id)).thenReturn(Optional.empty());
 
         assertThrows(IllegalArgumentException.class, () -> timeSlotService.updateTimeSlot(id, update));
-<<<<<<< HEAD
-=======
-        verify(timeSlotRepository, never()).save(any());
->>>>>>> d4766c3 (Add tests, indexes, and ensure strong consistency when booking)
     }
 
     @Test

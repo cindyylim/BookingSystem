@@ -20,10 +20,6 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
-<<<<<<< HEAD
-=======
-import static org.junit.jupiter.api.Assertions.assertFalse;
->>>>>>> d4766c3 (Add tests, indexes, and ensure strong consistency when booking)
 
 /**
  * Unit tests for AppointmentService.
@@ -108,11 +104,6 @@ public class AppointmentServiceTest {
         verify(timeSlotRepository).findById(1L);
         verify(appointmentRepository).save(any(Appointment.class));
         verify(mailSender).send(any(MimeMessage.class));
-<<<<<<< HEAD
-=======
-        assertNotNull(result.getCancellationToken());
-        assertTrue(result.getCancellationToken().length() > 0);
->>>>>>> d4766c3 (Add tests, indexes, and ensure strong consistency when booking)
     }
 
     @Test
@@ -140,11 +131,6 @@ public class AppointmentServiceTest {
         verify(timeSlotRepository).findById(1L);
         verify(appointmentRepository).save(any(Appointment.class));
         verify(mailSender).send(any(MimeMessage.class));
-<<<<<<< HEAD
-=======
-        assertNotNull(result.getCancellationToken());
-        assertTrue(result.getCancellationToken().length() > 0);
->>>>>>> d4766c3 (Add tests, indexes, and ensure strong consistency when booking)
     }
 
     @Test
@@ -188,7 +174,6 @@ public class AppointmentServiceTest {
     }
 
     @Test
-<<<<<<< HEAD
     void testBookAppointment_GeneratesCancellationToken() {
         // Arrange
         when(timeSlotRepository.markAsUnavailableIfAvailable(1L)).thenReturn(1);
@@ -208,8 +193,6 @@ public class AppointmentServiceTest {
     }
 
     @Test
-=======
->>>>>>> d4766c3 (Add tests, indexes, and ensure strong consistency when booking)
     void testCancelAppointment_Success() {
         // Arrange
         Appointment appointment = new Appointment();
@@ -230,60 +213,6 @@ public class AppointmentServiceTest {
     }
 
     @Test
-<<<<<<< HEAD
-=======
-    void testCancelAppointment_NullTimeSlot() {
-        // Arrange
-        Appointment appointment = new Appointment();
-        appointment.setId(100L);
-        appointment.setTimeSlot(null);
-        appointment.setStartTime(OffsetDateTime.now());
-        appointment.setEndTime(OffsetDateTime.now().plusHours(1));
-
-        when(appointmentRepository.findById(100L)).thenReturn(Optional.of(appointment));
-        when(timeSlotRepository.findByTime(appointment.getStartTime(), appointment.getEndTime())).thenReturn(null);
-        doNothing().when(appointmentRepository).delete(appointment);
-
-        // Act
-        appointmentService.cancelAppointment(100L);
-
-        // Assert
-        verify(appointmentRepository).findById(100L);
-        verify(timeSlotRepository).findByTime(appointment.getStartTime(), appointment.getEndTime());
-        verify(timeSlotRepository, never()).save(any());
-        verify(appointmentRepository).delete(appointment);
-    }
-
-    @Test
-    void testCancelAppointment_FindTimeSlot() {
-        // Arrange
-        Appointment appointment = new Appointment();
-        appointment.setId(100L);
-        appointment.setTimeSlot(null);
-        appointment.setStartTime(OffsetDateTime.now());
-        appointment.setEndTime(OffsetDateTime.now().plusHours(1));
-        TimeSlot timeSlot = new TimeSlot();
-        timeSlot.setId(1L);
-        timeSlot.setStartTime(appointment.getStartTime());
-        timeSlot.setEndTime(appointment.getEndTime());
-        timeSlot.setAvailable(false);
-        when(appointmentRepository.findById(100L)).thenReturn(Optional.of(appointment));
-        when(timeSlotRepository.findByTime(appointment.getStartTime(), appointment.getEndTime())).thenReturn(timeSlot);
-        doNothing().when(appointmentRepository).delete(appointment);
-
-        // Act
-        appointmentService.cancelAppointment(100L);
-
-        // Assert
-        verify(appointmentRepository).findById(100L);
-        verify(timeSlotRepository).findByTime(appointment.getStartTime(), appointment.getEndTime());
-        verify(timeSlotRepository).save(timeSlot);
-        assertTrue(timeSlot.isAvailable());
-        verify(appointmentRepository).delete(appointment);
-    }
-
-    @Test
->>>>>>> d4766c3 (Add tests, indexes, and ensure strong consistency when booking)
     void testCancelAppointment_WhenNotFound() {
         // Arrange
         when(appointmentRepository.findById(999L)).thenReturn(Optional.empty());
@@ -292,10 +221,7 @@ public class AppointmentServiceTest {
         appointmentService.cancelAppointment(999L);
 
         // Assert
-<<<<<<< HEAD
         verify(appointmentRepository).findById(999L);
-=======
->>>>>>> d4766c3 (Add tests, indexes, and ensure strong consistency when booking)
         verify(appointmentRepository, never()).delete(any());
         verify(timeSlotRepository, never()).save(any());
     }
@@ -331,16 +257,8 @@ public class AppointmentServiceTest {
         appointment.setId(100L);
         appointment.setCancellationToken(token);
         appointment.setTimeSlot(null);
-<<<<<<< HEAD
 
         when(appointmentRepository.findByCancellationToken(token)).thenReturn(appointment);
-=======
-        appointment.setStartTime(OffsetDateTime.now().plusDays(1));
-        appointment.setEndTime(OffsetDateTime.now().plusDays(1).plusHours(1));
-
-        when(appointmentRepository.findByCancellationToken(token)).thenReturn(appointment);
-        when(timeSlotRepository.findByTime(appointment.getStartTime(), appointment.getEndTime())).thenReturn(null);
->>>>>>> d4766c3 (Add tests, indexes, and ensure strong consistency when booking)
         doNothing().when(appointmentRepository).delete(appointment);
 
         // Act
@@ -354,40 +272,6 @@ public class AppointmentServiceTest {
     }
 
     @Test
-<<<<<<< HEAD
-=======
-    void testCancelAppointmentByToken_SuccessFindTimeSlot() {
-        // Arrange
-        String token = "test-token-123";
-        Appointment appointment = new Appointment();
-        appointment.setId(100L);
-        appointment.setCancellationToken(token);
-        appointment.setTimeSlot(null);
-        appointment.setStartTime(OffsetDateTime.now().plusDays(1));
-        appointment.setEndTime(OffsetDateTime.now().plusDays(1).plusHours(1));
-        TimeSlot timeSlot = new TimeSlot();
-        timeSlot.setId(1L);
-        timeSlot.setStartTime(appointment.getStartTime());
-        timeSlot.setEndTime(appointment.getEndTime());
-        timeSlot.setAvailable(false);
-
-        when(appointmentRepository.findByCancellationToken(token)).thenReturn(appointment);
-        when(timeSlotRepository.findByTime(appointment.getStartTime(), appointment.getEndTime())).thenReturn(timeSlot);
-        doNothing().when(appointmentRepository).delete(appointment);
-
-        // Act
-        boolean result = appointmentService.cancelAppointmentByToken(token);
-
-        // Assert
-        assertTrue(result);
-        verify(appointmentRepository).findByCancellationToken(token);
-        verify(timeSlotRepository).save(timeSlot);
-        assertTrue(timeSlot.isAvailable());
-        verify(appointmentRepository).delete(appointment);
-    }
-
-    @Test
->>>>>>> d4766c3 (Add tests, indexes, and ensure strong consistency when booking)
     void testCancelAppointmentByToken_InvalidToken() {
         // Arrange
         when(appointmentRepository.findByCancellationToken("invalid-token")).thenReturn(null);
@@ -403,7 +287,6 @@ public class AppointmentServiceTest {
     }
 
     @Test
-<<<<<<< HEAD
     void testCancelAppointment_WithNullTimeSlot() {
         // Arrange
         Appointment appointment = new Appointment();
@@ -422,8 +305,6 @@ public class AppointmentServiceTest {
     }
 
     @Test
-=======
->>>>>>> d4766c3 (Add tests, indexes, and ensure strong consistency when booking)
     void testGetAllAppointments() {
         // Arrange
         when(appointmentRepository.findAll()).thenReturn(java.util.List.of(testAppointment));

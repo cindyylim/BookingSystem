@@ -7,10 +7,9 @@ A full-stack booking system with:
 - User authentication (JWT)
 - Admin time slot management
 - User dashboard (upcoming/history bookings, profile)
-- Guest booking support
 
 ## Features
-- Book appointments as a guest or registered user
+- Book appointments 
 - View available time slots in a calendar (local time zone)
 - Email confirmation with cancellation link
 - User dashboard: upcoming bookings, history bookings, profile edit, cancel bookings
@@ -99,7 +98,6 @@ spring.mail.properties.mail.smtp.writetimeout=5000
 
 ## Usage
 
-- **Book as Guest:** Click "Continue as Guest" and book an appointment.
 - **Register/Login:** Create an account or log in to access your dashboard.
 - **User Dashboard:** View/cancel/reschedule bookings, edit profile.
 - **Admin:** Click "Admin Login" (top right), log in, and manage time slots.
@@ -112,7 +110,7 @@ spring.mail.properties.mail.smtp.writetimeout=5000
 - `/api/auth/login` — Login (returns JWT)
 - `/api/user/profile` — Get/update user profile (JWT required)
 - `/api/user/appointments` — Get user bookings (JWT required)
-- `/api/appointments` — Book appointment (guest or user)
+- `/api/appointments` — Book appointment 
 - `/api/appointments/cancel/{token}` — Cancel by link
 - `/api/timeslots` — Admin time slot management (basic auth)
 
