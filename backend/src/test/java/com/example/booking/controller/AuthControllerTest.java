@@ -113,6 +113,7 @@ public class AuthControllerTest {
         user.setRole("USER");
 
         when(authService.login(any(LoginRequest.class))).thenReturn(new AuthResult(user, "fake-jwt-token"));
+        when(jwtService.getExpirationSeconds()).thenReturn(3600L);
 
         LoginRequest req = new LoginRequest();
         req.setUsername("testuser");
@@ -169,5 +170,51 @@ public class AuthControllerTest {
     public void testMeNotFound() throws Exception {
         mockMvc.perform(get("/api/auth/me"))
                 .andExpect(status().is(401));
+    }
+
+    @Test
+    @WithMockUser(username = "gone")
+    public void testMePrincipalPresentUserGone() throws Exception {
+        when(authService.currentUser("gone")).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/auth/me"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    public void testRegisterShortPassword() throws Exception {
+        RegisterRequest req = new RegisterRequest();
+        req.setUsername("newuser");
+        req.setPassword("123");
+        req.setEmail("new@example.com");
+        req.setPhone("1234567890");
+
+        mockMvc.perform(post("/api/auth/register")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    public void testRegisterMissingFields() throws Exception {
+        mockMvc.perform(post("/api/auth/register")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    public void testLoginMissingFields() throws Exception {
+        LoginRequest req = new LoginRequest();
+        req.setUsername("");
+        req.setPassword("");
+
+        mockMvc.perform(post("/api/auth/login")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest());
     }
 }

@@ -91,6 +91,22 @@ public class UserServiceTest {
     }
 
     @Test
+    void testUpdateProfileSkipsNullEmailAndPhone() {
+        User user = new User();
+        user.setUsername("testuser");
+        user.setEmail("keep@example.com");
+        user.setPhone("111");
+
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
+        when(userRepository.save(user)).thenReturn(user);
+
+        User updated = userService.updateProfile("testuser", null, null);
+
+        assertEquals("keep@example.com", updated.getEmail());
+        assertEquals("111", updated.getPhone());
+    }
+
+    @Test
     void testUpdateProfileNotFound() {
         when(userRepository.findByUsername("missing")).thenReturn(Optional.empty());
         assertThrows(ResourceNotFoundException.class,

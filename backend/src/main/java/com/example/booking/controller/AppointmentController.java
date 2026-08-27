@@ -19,13 +19,13 @@ public class AppointmentController {
     }
 
     @GetMapping
-    public List<Appointment> getAllAppointments() {
-        return appointmentService.getAllAppointments();
+    public List<Appointment> getAllAppointments(Authentication authentication) {
+        return appointmentService.getAppointmentsVisibleTo(authentication.getName());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Appointment> getAppointment(@PathVariable Long id) {
-        return appointmentService.getAppointment(id)
+    public ResponseEntity<Appointment> getAppointment(@PathVariable Long id, Authentication authentication) {
+        return appointmentService.getAppointmentForUser(id, authentication.getName())
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -33,16 +33,13 @@ public class AppointmentController {
     @PostMapping
     public ResponseEntity<Appointment> bookAppointment(@RequestBody AppointmentRequest request,
             Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return ResponseEntity.status(401).build();
-        }
         Appointment booked = appointmentService.bookAppointmentForUser(authentication.getName(), request);
         return ResponseEntity.ok(booked);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> cancelAppointment(@PathVariable Long id) {
-        appointmentService.cancelAppointment(id);
+    public ResponseEntity<Void> cancelAppointment(@PathVariable Long id, Authentication authentication) {
+        appointmentService.cancelAppointment(id, authentication.getName());
         return ResponseEntity.noContent().build();
     }
 

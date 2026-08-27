@@ -59,7 +59,9 @@ public class DtoMapperTest {
         appt.setCustomerName("Jane");
         ts.setAppointments(List.of(appt));
 
-        TimeSlotDTO dto = TimeSlotMapper.toDTO(ts);
+        assertTrue(TimeSlotMapper.toDTO(ts).getAppointments().isEmpty());
+
+        TimeSlotDTO dto = TimeSlotMapper.toDTO(ts, true);
 
         assertEquals(ts.getId(), dto.getId());
         assertEquals(ts.getStartTime(), dto.getStartTime());

@@ -59,7 +59,7 @@ public class AppointmentControllerTest {
         appt.setId(1L);
         appt.setCustomerName("Test Customer");
 
-        when(appointmentService.getAllAppointments()).thenReturn(List.of(appt));
+        when(appointmentService.getAppointmentsVisibleTo("testuser")).thenReturn(List.of(appt));
 
         mockMvc.perform(get("/api/appointments"))
                 .andExpect(status().isOk())
@@ -72,7 +72,7 @@ public class AppointmentControllerTest {
         Appointment appt = new Appointment();
         appt.setId(1L);
 
-        when(appointmentService.getAppointment(1L)).thenReturn(Optional.of(appt));
+        when(appointmentService.getAppointmentForUser(1L, "testuser")).thenReturn(Optional.of(appt));
 
         mockMvc.perform(get("/api/appointments/1"))
                 .andExpect(status().isOk())
@@ -169,10 +169,46 @@ public class AppointmentControllerTest {
     @Test
     @WithMockUser(username = "testuser")
     public void testDeleteAppointment() throws Exception {
-        doNothing().when(appointmentService).cancelAppointment(1L);
+        doNothing().when(appointmentService).cancelAppointment(1L, "testuser");
 
         mockMvc.perform(delete("/api/appointments/1").with(csrf()))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    public void testGetAllAppointmentsUnauthenticated() throws Exception {
+        mockMvc.perform(get("/api/appointments"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    public void testBookAppointmentUnauthenticated() throws Exception {
+        AppointmentRequest req = new AppointmentRequest();
+        req.setTimeSlotId(1L);
+
+        mockMvc.perform(post("/api/appointments")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "testuser")
+    public void testGetAppointmentNotFound() throws Exception {
+        when(appointmentService.getAppointmentForUser(99L, "testuser")).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/appointments/99"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    public void testCancelByTokenDelete() throws Exception {
+        when(appointmentService.cancelAppointmentByToken("token123")).thenReturn(true);
+
+        mockMvc.perform(delete("/api/appointments/cancel/token123").with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").value("Your appointment has been cancelled."));
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.example.booking.config;
 import com.example.booking.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -30,7 +31,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/appointments/cancel/**").permitAll()
-                .requestMatchers("/api/appointments").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/timeslots", "/api/timeslots/*").permitAll()
+                .requestMatchers("/api/timeslots/**").hasRole("ADMIN")
                 .requestMatchers("/api/appointments/**").authenticated()
                 .requestMatchers("/api/user/**").authenticated()
                 .anyRequest().permitAll()

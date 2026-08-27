@@ -48,6 +48,27 @@ public class UserControllerTest {
     private JwtService jwtService;
 
     @Test
+    public void testGetProfileUnauthenticated() throws Exception {
+        mockMvc.perform(get("/api/user/profile"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    public void testGetUserAppointmentsUnauthenticated() throws Exception {
+        mockMvc.perform(get("/api/user/appointments"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    public void testUpdateProfileUnauthenticated() throws Exception {
+        mockMvc.perform(put("/api/user/profile")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\": \"new@example.com\", \"phone\": \"0987654321\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     @WithMockUser(username = "testuser")
     public void testGetProfile() throws Exception {
         User user = new User();

@@ -11,17 +11,13 @@ import Grid from '@mui/material/Grid';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 
 function AppointmentForm({ timeSlot, onBooked, onCancel, user }) {
-  const prev = timeSlot.previousAppointment || {};
-  const [service, setService] = useState(prev.service || '');
-  const [location, setLocation] = useState(prev.location || '');
+  const [service, setService] = useState('');
+  const [location, setLocation] = useState('');
   const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (timeSlot.previousAppointment && timeSlot.previousAppointment.cancellationToken) {
-      await fetch(`/api/appointments/cancel/${timeSlot.previousAppointment.cancellationToken}`, { method: 'DELETE' });
-    }
     const headers = { 'Content-Type': 'application/json' };
 
     const res = await fetch('/api/appointments', {

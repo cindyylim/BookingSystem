@@ -7,6 +7,8 @@ import com.example.booking.model.TimeSlot;
 import com.example.booking.service.TimeSlotService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.OffsetDateTime;
@@ -23,16 +25,19 @@ public class TimeSlotController {
     }
 
     @GetMapping
-    public List<TimeSlotDTO> getAllTimeSlots() {
-        return timeSlotService.getAllTimeSlots().stream()
-                .map(TimeSlotMapper::toDTO)
+    public List<TimeSlotDTO> getAllTimeSlots(Authentication authentication) {
+        boolean admin = isAdmin(authentication);
+        List<TimeSlot> slots = admin ? timeSlotService.getAllTimeSlots() : timeSlotService.getAvailableTimeSlots();
+        return slots.stream()
+                .map(slot -> TimeSlotMapper.toDTO(slot, admin))
                 .collect(Collectors.toList());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<TimeSlotDTO> getTimeSlot(@PathVariable Long id) {
+    public ResponseEntity<TimeSlotDTO> getTimeSlot(@PathVariable Long id, Authentication authentication) {
+        boolean admin = isAdmin(authentication);
         return timeSlotService.getTimeSlot(id)
-                .map(TimeSlotMapper::toDTO)
+                .map(slot -> TimeSlotMapper.toDTO(slot, admin))
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -55,5 +60,14 @@ public class TimeSlotController {
     public ResponseEntity<Void> deleteTimeSlot(@PathVariable Long id) {
         timeSlotService.deleteTimeSlot(id);
         return ResponseEntity.noContent().build();
+    }
+
+    private static boolean isAdmin(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return false;
+        }
+        return authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch("ROLE_ADMIN"::equals);
     }
 }

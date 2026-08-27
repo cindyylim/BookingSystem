@@ -20,6 +20,11 @@ import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -270,5 +275,145 @@ class TimeSlotServiceTest {
 
         assertThrows(IllegalArgumentException.class, () -> timeSlotService.updateTimeSlot(id, update));
         verify(timeSlotRepository, never()).save(any());
+    }
+
+    @Test
+    void createTimeSlot_ConcurrentOverlapping_SerializedByLock() throws Exception {
+        TimeSlot first = new TimeSlot();
+        first.setStartTime(OffsetDateTime.parse("2023-10-01T10:00:00Z"));
+        first.setEndTime(OffsetDateTime.parse("2023-10-01T11:00:00Z"));
+        TimeSlot second = new TimeSlot();
+        second.setStartTime(OffsetDateTime.parse("2023-10-01T10:30:00Z"));
+        second.setEndTime(OffsetDateTime.parse("2023-10-01T11:30:00Z"));
+
+        CountDownLatch overlapLookupStarted = new CountDownLatch(1);
+        CountDownLatch allowOverlapLookupToFinish = new CountDownLatch(1);
+        AtomicInteger overlapLookups = new AtomicInteger();
+
+        when(timeSlotRepository.findOverlappingSlots(any(), any())).thenAnswer(invocation -> {
+            int n = overlapLookups.incrementAndGet();
+            if (n == 1) {
+                overlapLookupStarted.countDown();
+                if (!allowOverlapLookupToFinish.await(2, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("timed out waiting to finish overlap lookup");
+                }
+                return Collections.emptyList();
+            }
+            return List.of(first);
+        });
+        when(timeSlotRepository.save(any(TimeSlot.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch done = new CountDownLatch(2);
+        AtomicInteger success = new AtomicInteger();
+        AtomicInteger failure = new AtomicInteger();
+
+        executor.submit(() -> {
+            try {
+                timeSlotService.createTimeSlot(first);
+                success.incrementAndGet();
+            } catch (Exception e) {
+                failure.incrementAndGet();
+            } finally {
+                done.countDown();
+            }
+        });
+        executor.submit(() -> {
+            try {
+                if (!overlapLookupStarted.await(2, TimeUnit.SECONDS)) {
+                    failure.incrementAndGet();
+                    return;
+                }
+                timeSlotService.createTimeSlot(second);
+                success.incrementAndGet();
+            } catch (Exception e) {
+                failure.incrementAndGet();
+            } finally {
+                done.countDown();
+            }
+        });
+
+        // If the lock is held, the second create waits until the first lookup+save finishes.
+        allowOverlapLookupToFinish.countDown();
+        done.await(5, TimeUnit.SECONDS);
+        executor.shutdown();
+
+        assertEquals(1, success.get());
+        assertEquals(1, failure.get());
+    }
+
+    @Test
+    void updateTimeSlot_ConcurrentOverlapping_SerializedByLock() throws Exception {
+        TimeSlot existingA = new TimeSlot();
+        existingA.setId(1L);
+        existingA.setStartTime(OffsetDateTime.parse("2023-10-01T08:00:00Z"));
+        existingA.setEndTime(OffsetDateTime.parse("2023-10-01T09:00:00Z"));
+        TimeSlot existingB = new TimeSlot();
+        existingB.setId(2L);
+        existingB.setStartTime(OffsetDateTime.parse("2023-10-01T12:00:00Z"));
+        existingB.setEndTime(OffsetDateTime.parse("2023-10-01T13:00:00Z"));
+
+        TimeSlot updateA = new TimeSlot();
+        updateA.setStartTime(OffsetDateTime.parse("2023-10-01T10:00:00Z"));
+        updateA.setEndTime(OffsetDateTime.parse("2023-10-01T11:00:00Z"));
+        TimeSlot updateB = new TimeSlot();
+        updateB.setStartTime(OffsetDateTime.parse("2023-10-01T10:30:00Z"));
+        updateB.setEndTime(OffsetDateTime.parse("2023-10-01T11:30:00Z"));
+
+        CountDownLatch overlapLookupStarted = new CountDownLatch(1);
+        CountDownLatch allowOverlapLookupToFinish = new CountDownLatch(1);
+        AtomicInteger overlapLookups = new AtomicInteger();
+
+        when(timeSlotRepository.findById(1L)).thenReturn(Optional.of(existingA));
+        when(timeSlotRepository.findById(2L)).thenReturn(Optional.of(existingB));
+        when(timeSlotRepository.findOverlappingSlotsExcluding(any(), any(), any())).thenAnswer(invocation -> {
+            int n = overlapLookups.incrementAndGet();
+            if (n == 1) {
+                overlapLookupStarted.countDown();
+                if (!allowOverlapLookupToFinish.await(2, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("timed out waiting to finish overlap lookup");
+                }
+                return Collections.emptyList();
+            }
+            return List.of(existingA);
+        });
+        when(timeSlotRepository.save(any(TimeSlot.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch done = new CountDownLatch(2);
+        AtomicInteger success = new AtomicInteger();
+        AtomicInteger failure = new AtomicInteger();
+
+        executor.submit(() -> {
+            try {
+                timeSlotService.updateTimeSlot(1L, updateA);
+                success.incrementAndGet();
+            } catch (Exception e) {
+                failure.incrementAndGet();
+            } finally {
+                done.countDown();
+            }
+        });
+        executor.submit(() -> {
+            try {
+                if (!overlapLookupStarted.await(2, TimeUnit.SECONDS)) {
+                    failure.incrementAndGet();
+                    return;
+                }
+                timeSlotService.updateTimeSlot(2L, updateB);
+                success.incrementAndGet();
+            } catch (Exception e) {
+                failure.incrementAndGet();
+            } finally {
+                done.countDown();
+            }
+        });
+
+        allowOverlapLookupToFinish.countDown();
+        done.await(5, TimeUnit.SECONDS);
+        executor.shutdown();
+
+        assertEquals(1, success.get());
+        assertEquals(1, failure.get());
     }
 }

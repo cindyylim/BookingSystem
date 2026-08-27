@@ -11,11 +11,20 @@ import java.util.stream.Collectors;
 public class TimeSlotMapper {
 
     public static TimeSlotDTO toDTO(TimeSlot timeSlot) {
+        return toDTO(timeSlot, false);
+    }
+
+    public static TimeSlotDTO toDTO(TimeSlot timeSlot, boolean includeAppointments) {
         TimeSlotDTO dto = new TimeSlotDTO();
         dto.setId(timeSlot.getId());
         dto.setStartTime(timeSlot.getStartTime());
         dto.setEndTime(timeSlot.getEndTime());
         dto.setAvailable(timeSlot.isAvailable());
+
+        if (!includeAppointments) {
+            dto.setAppointments(List.of());
+            return dto;
+        }
 
         List<Appointment> source = timeSlot.getAppointments();
         List<AppointmentDTO> appointments = source == null

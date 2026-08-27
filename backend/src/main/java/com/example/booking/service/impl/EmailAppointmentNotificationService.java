@@ -5,6 +5,7 @@ import com.example.booking.service.AppointmentNotificationService;
 import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -14,9 +15,12 @@ public class EmailAppointmentNotificationService implements AppointmentNotificat
     private static final Logger log = LoggerFactory.getLogger(EmailAppointmentNotificationService.class);
 
     private final JavaMailSender mailSender;
+    private final String baseUrl;
 
-    public EmailAppointmentNotificationService(JavaMailSender mailSender) {
+    public EmailAppointmentNotificationService(JavaMailSender mailSender,
+            @Value("${app.base-url:http://localhost:8080}") String baseUrl) {
         this.mailSender = mailSender;
+        this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
     }
 
     @Override
@@ -26,7 +30,7 @@ public class EmailAppointmentNotificationService implements AppointmentNotificat
             return;
         }
         String subject = "Appointment Confirmation & Cancellation Link";
-        String cancelUrl = "http://localhost:8080/api/appointments/cancel/" + appointment.getCancellationToken();
+        String cancelUrl = baseUrl + "/api/appointments/cancel/" + appointment.getCancellationToken();
         String text = String.format(
                 "Dear %s,%n%nYour appointment is confirmed for %s - %s.%n%nIf you wish to cancel, click here: %s%n%nThank you!",
                 appointment.getCustomerName(),

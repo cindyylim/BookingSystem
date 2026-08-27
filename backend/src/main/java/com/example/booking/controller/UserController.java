@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+import com.example.booking.util.JsonMaps;
+
 @RestController
 @RequestMapping("/api/user")
 public class UserController {
@@ -25,7 +27,7 @@ public class UserController {
     @GetMapping("/profile")
     public ResponseEntity<?> getProfile(Authentication auth) {
         User user = requireUser(auth.getName());
-        return ResponseEntity.ok(Map.of(
+        return ResponseEntity.ok(JsonMaps.ofNullable(
                 "username", user.getUsername(),
                 "email", user.getEmail(),
                 "phone", user.getPhone()));

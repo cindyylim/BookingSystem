@@ -13,15 +13,19 @@ public interface AppointmentService {
 
     List<Appointment> getAppointmentsForUser(Long userId);
 
+    List<Appointment> getAppointmentsVisibleTo(String username);
+
     UserAppointmentsResponse getUpcomingAndHistoryForUser(Long userId);
 
     Optional<Appointment> getAppointment(Long id);
+
+    Optional<Appointment> getAppointmentForUser(Long id, String username);
 
     Appointment bookAppointment(Appointment appointment, Long timeSlotId, User user);
 
     Appointment bookAppointmentForUser(String username, AppointmentRequest request);
 
-    void cancelAppointment(Long id);
+    void cancelAppointment(Long id, String username);
 
     boolean cancelAppointmentByToken(String token);
 }

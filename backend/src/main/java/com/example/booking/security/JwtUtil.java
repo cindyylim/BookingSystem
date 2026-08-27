@@ -15,7 +15,8 @@ public class JwtUtil implements JwtService {
     @Value("${jwt.secret}")
     private String secretString;
 
-    private final long EXPIRATION_TIME = 1000 * 60 * 60; // 1 hour
+    @Value("${jwt.expiration-ms:3600000}")
+    private long expirationMs;
 
     private SecretKey getSigningKey() {
         // Ensure the secret is converted to bytes correctly
@@ -28,7 +29,7 @@ public class JwtUtil implements JwtService {
         return Jwts.builder()
                 .setSubject(username)
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
+                .setExpiration(new Date(System.currentTimeMillis() + expirationMs))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS512)
                 .compact();
     }
@@ -60,5 +61,10 @@ public class JwtUtil implements JwtService {
             // This is where 'MalformedJwt' is caught and turned into a simple 'false'
             return false;
         }
+    }
+
+    @Override
+    public long getExpirationSeconds() {
+        return Math.max(1, expirationMs / 1000);
     }
 }

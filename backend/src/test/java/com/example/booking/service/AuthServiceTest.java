@@ -12,6 +12,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
@@ -60,6 +61,61 @@ class AuthServiceTest {
 
         assertThrows(IllegalArgumentException.class, () -> authService.register(request));
         verify(userService, never()).createUser(any());
+    }
+
+    @Test
+    void registerMapsDataIntegrityViolationToAlreadyExists() {
+        RegisterRequest request = new RegisterRequest();
+        request.setUsername("new");
+        request.setPassword("secret1");
+        request.setEmail("new@example.com");
+        request.setPhone("1234567890");
+
+        when(userService.getUserByUsername("new")).thenReturn(Optional.empty());
+        when(userService.getUserByEmail("new@example.com")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode("secret1")).thenReturn("hashed");
+        doThrow(new DataIntegrityViolationException("duplicate")).when(userService).createUser(any(User.class));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> authService.register(request));
+        assertEquals("Username or email already exists", ex.getMessage());
+    }
+
+    @Test
+    void registerRejectsDuplicateEmailWhenUsernameEmpty() {
+        RegisterRequest request = new RegisterRequest();
+        request.setUsername("");
+        request.setEmail("taken@example.com");
+
+        when(userService.getUserByUsername("")).thenReturn(Optional.empty());
+        when(userService.getUserByEmail("taken@example.com")).thenReturn(Optional.of(new User()));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> authService.register(request));
+        assertEquals("Username or email already exists", ex.getMessage());
+        verify(userService, never()).createUser(any());
+    }
+
+    @Test
+    void loginUnknownUsername() {
+        when(userService.getUserByUsername("missing")).thenReturn(Optional.empty());
+
+        LoginRequest request = new LoginRequest();
+        request.setUsername("missing");
+        request.setPassword("pw");
+
+        assertThrows(UnauthorizedException.class, () -> authService.login(request));
+        verify(jwtService, never()).generateToken(any());
+    }
+
+    @Test
+    void currentUserDelegatesToUserService() {
+        User user = new User();
+        user.setUsername("u");
+        when(userService.getUserByUsername("u")).thenReturn(Optional.of(user));
+
+        Optional<User> result = authService.currentUser("u");
+
+        assertTrue(result.isPresent());
+        assertEquals("u", result.get().getUsername());
     }
 
     @Test

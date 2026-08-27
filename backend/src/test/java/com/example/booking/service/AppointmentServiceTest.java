@@ -2,6 +2,7 @@ package com.example.booking.service;
 
 import com.example.booking.dto.AppointmentRequest;
 import com.example.booking.exception.ConflictException;
+import com.example.booking.exception.ResourceNotFoundException;
 import com.example.booking.model.Appointment;
 import com.example.booking.model.TimeSlot;
 import com.example.booking.model.User;
@@ -14,8 +15,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -180,10 +185,11 @@ public class AppointmentServiceTest {
         appointment.setId(100L);
         appointment.setTimeSlot(unavailableTimeSlot);
 
+        appointment.setUser(testUser);
         when(appointmentRepository.findById(100L)).thenReturn(Optional.of(appointment));
-        when(appointmentRepository.existsByTimeSlot_Id(2L)).thenReturn(false);
+        when(userService.getUserByUsername("testuser")).thenReturn(Optional.of(testUser));
 
-        appointmentService.cancelAppointment(100L);
+        appointmentService.cancelAppointment(100L, "testuser");
 
         verify(appointmentRepository).delete(appointment);
         verify(timeSlotRepository).markAsAvailable(2L);
@@ -191,9 +197,10 @@ public class AppointmentServiceTest {
 
     @Test
     void testCancelAppointment_WhenNotFound() {
+        when(userService.getUserByUsername("testuser")).thenReturn(Optional.of(testUser));
         when(appointmentRepository.findById(999L)).thenReturn(Optional.empty());
 
-        appointmentService.cancelAppointment(999L);
+        appointmentService.cancelAppointment(999L, "testuser");
 
         verify(appointmentRepository).findById(999L);
         verify(appointmentRepository, never()).delete(any());
@@ -209,7 +216,6 @@ public class AppointmentServiceTest {
         appointment.setTimeSlot(unavailableTimeSlot);
 
         when(appointmentRepository.findByCancellationToken(token)).thenReturn(appointment);
-        when(appointmentRepository.existsByTimeSlot_Id(2L)).thenReturn(false);
 
         boolean result = appointmentService.cancelAppointmentByToken(token);
 
@@ -251,12 +257,125 @@ public class AppointmentServiceTest {
         appointment.setId(100L);
         appointment.setTimeSlot(null);
 
+        appointment.setUser(testUser);
         when(appointmentRepository.findById(100L)).thenReturn(Optional.of(appointment));
+        when(userService.getUserByUsername("testuser")).thenReturn(Optional.of(testUser));
 
-        appointmentService.cancelAppointment(100L);
+        appointmentService.cancelAppointment(100L, "testuser");
 
         verify(appointmentRepository).delete(appointment);
         verify(timeSlotRepository, never()).markAsAvailable(any());
+    }
+
+    @Test
+    void testGetUpcomingAndHistoryForUser_SplitsFuturePastAndDropsNullStart() {
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        Appointment upcoming = new Appointment();
+        upcoming.setId(1L);
+        upcoming.setStartTime(now.plusDays(1));
+        Appointment past = new Appointment();
+        past.setId(2L);
+        past.setStartTime(now.minusDays(1));
+        Appointment noStart = new Appointment();
+        noStart.setId(3L);
+        noStart.setStartTime(null);
+
+        when(appointmentRepository.findByUserId(1L)).thenReturn(List.of(upcoming, past, noStart));
+
+        var result = appointmentService.getUpcomingAndHistoryForUser(1L);
+
+        assertEquals(1, result.getUpcoming().size());
+        assertEquals(1L, result.getUpcoming().get(0).getId());
+        assertEquals(1, result.getHistory().size());
+        assertEquals(2L, result.getHistory().get(0).getId());
+    }
+
+    @Test
+    void testCancelAppointment_NotOwner_DoesNotDelete() {
+        User owner = new User();
+        owner.setId(2L);
+        Appointment appointment = new Appointment();
+        appointment.setId(100L);
+        appointment.setUser(owner);
+        appointment.setTimeSlot(unavailableTimeSlot);
+
+        when(userService.getUserByUsername("testuser")).thenReturn(Optional.of(testUser));
+        when(appointmentRepository.findById(100L)).thenReturn(Optional.of(appointment));
+
+        appointmentService.cancelAppointment(100L, "testuser");
+
+        verify(appointmentRepository, never()).delete(any());
+        verify(timeSlotRepository, never()).markAsAvailable(any());
+    }
+
+    @Test
+    void testGetAppointmentsVisibleTo_AdminSeesAll() {
+        User admin = new User();
+        admin.setId(9L);
+        admin.setUsername("admin");
+        admin.setRole("ADMIN");
+        when(userService.getUserByUsername("admin")).thenReturn(Optional.of(admin));
+        when(appointmentRepository.findAll()).thenReturn(List.of(testAppointment));
+
+        assertEquals(1, appointmentService.getAppointmentsVisibleTo("admin").size());
+        verify(appointmentRepository).findAll();
+    }
+
+    @Test
+    void testGetAppointmentsVisibleTo_UserSeesOwn() {
+        testUser.setRole("USER");
+        when(userService.getUserByUsername("testuser")).thenReturn(Optional.of(testUser));
+        when(appointmentRepository.findByUserId(1L)).thenReturn(List.of(testAppointment));
+
+        assertEquals(1, appointmentService.getAppointmentsVisibleTo("testuser").size());
+        verify(appointmentRepository).findByUserId(1L);
+        verify(appointmentRepository, never()).findAll();
+    }
+
+    @Test
+    void testBookAppointmentForUser_UserNotFound() {
+        AppointmentRequest request = new AppointmentRequest();
+        request.setTimeSlotId(1L);
+        when(userService.getUserByUsername("missing")).thenReturn(Optional.empty());
+
+        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class,
+                () -> appointmentService.bookAppointmentForUser("missing", request));
+        assertEquals("User not found", exception.getMessage());
+        verify(timeSlotRepository, never()).markAsUnavailableIfAvailable(any());
+    }
+
+    @Test
+    void testBookAppointmentForUser_FallsBackToRequestWhenEmailAndPhoneNull() {
+        testUser.setEmail(null);
+        testUser.setPhone(null);
+        AppointmentRequest request = new AppointmentRequest();
+        request.setTimeSlotId(1L);
+        request.setLocation("Office A");
+        request.setService("Consultation");
+        request.setCustomerEmail("fallback@example.com");
+        request.setCustomerPhone("555-9999");
+
+        when(userService.getUserByUsername("testuser")).thenReturn(Optional.of(testUser));
+        when(timeSlotRepository.markAsUnavailableIfAvailable(1L)).thenReturn(1);
+        when(timeSlotRepository.findById(1L)).thenReturn(Optional.of(availableTimeSlot));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Appointment result = appointmentService.bookAppointmentForUser("testuser", request);
+
+        assertEquals("fallback@example.com", result.getCustomerEmail());
+        assertEquals("555-9999", result.getCustomerPhone());
+        assertEquals("testuser", result.getCustomerName());
+    }
+
+    @Test
+    void testBookAppointment_MarkUnavailableThenSlotMissing() {
+        when(timeSlotRepository.markAsUnavailableIfAvailable(1L)).thenReturn(1);
+        when(timeSlotRepository.findById(1L)).thenReturn(Optional.empty());
+
+        ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class,
+                () -> appointmentService.bookAppointment(testAppointment, 1L, testUser));
+        assertEquals("Time slot not found", exception.getMessage());
+        verify(appointmentRepository, never()).save(any());
     }
 
     @Test
@@ -289,5 +408,43 @@ public class AppointmentServiceTest {
 
         assertEquals(1, result.size());
         verify(appointmentRepository).findByUserId(userId);
+    }
+
+    @Test
+    void testBookAppointment_AfterCommitSendsConfirmation() {
+        when(timeSlotRepository.markAsUnavailableIfAvailable(1L)).thenReturn(1);
+        when(timeSlotRepository.findById(1L)).thenReturn(Optional.of(availableTimeSlot));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            appointmentService.bookAppointment(testAppointment, 1L, testUser);
+            verify(notificationService, never()).sendAppointmentConfirmation(any());
+
+            TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(TransactionSynchronization::afterCommit);
+
+            verify(notificationService).sendAppointmentConfirmation(any(Appointment.class));
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    void testBookAppointment_RollbackDoesNotSendConfirmation() {
+        when(timeSlotRepository.markAsUnavailableIfAvailable(1L)).thenReturn(1);
+        when(timeSlotRepository.findById(1L)).thenReturn(Optional.of(availableTimeSlot));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            appointmentService.bookAppointment(testAppointment, 1L, testUser);
+            TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(s -> s.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK));
+
+            verify(notificationService, never()).sendAppointmentConfirmation(any());
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 }

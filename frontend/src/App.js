@@ -51,7 +51,6 @@ function App() {
   const [user, setUser] = useState(null);
   const [showDashboard, setShowDashboard] = useState(false);
   const [userBookings, setUserBookings] = useState({ upcoming: [], history: [] });
-  const [guestMode, setGuestMode] = useState(false);
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [adminError, setAdminError] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -74,8 +73,9 @@ function App() {
       })
       .then(user => {
         setUser(user);
-        // Fetch bookings for restored user session
-        if (user && user.role !== 'ADMIN') {
+        if (user && user.role === 'ADMIN') {
+          setIsAdmin(true);
+        } else if (user) {
           fetchUserBookings();
         }
       })
@@ -125,13 +125,14 @@ function App() {
     await fetch('/api/auth/logout', { method: 'POST' });
     setUser(null);
     setShowDashboard(false);
+    setIsAdmin(false);
   };
 
   const handleProfileUpdate = async (e) => {
     e.preventDefault();
-    const form = e.target;
-    const email = form.email.value;
-    const phone = form.phone.value;
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get('email');
+    const phone = formData.get('phone');
     await fetch('/api/user/profile', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -145,7 +146,6 @@ function App() {
     setLastAppointment(null);
     setSelectedTimeSlot(null);
     setShowDashboard(false);
-    setGuestMode(false);
   };
 
   const handleAdminLogin = (userObj) => {
@@ -187,7 +187,7 @@ function App() {
       )}
 
       {/* Hero Section */}
-      {!user && !isAdmin && !bookingSuccess && !selectedTimeSlot && !showDashboard && !guestMode && (
+      {!user && !isAdmin && !bookingSuccess && !selectedTimeSlot && !showDashboard && (
         <Box sx={{
           background: 'linear-gradient(135deg, #1976d2 0%, #0d47a1 100%)',
           color: 'white',
@@ -221,7 +221,7 @@ function App() {
       <Container maxWidth="lg" sx={{ mb: 8 }}>
 
         {/* Features Section (Only on landing) */}
-        {!user && !isAdmin && !bookingSuccess && !selectedTimeSlot && !showDashboard && !guestMode && (
+        {!user && !isAdmin && !bookingSuccess && !selectedTimeSlot && !showDashboard && (
           <Grid container spacing={4} sx={{ mb: 6 }}>
             {[
               { icon: <CalendarMonthIcon fontSize="large" color="primary" />, title: "Easy Booking", desc: "Select a time slot that works for you in seconds." },

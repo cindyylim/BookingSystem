@@ -115,9 +115,27 @@ public class AppointmentServiceImpl implements AppointmentService {
     }
 
     @Override
+    public List<Appointment> getAppointmentsVisibleTo(String username) {
+        User actor = requireUser(username);
+        if (isAdmin(actor)) {
+            return appointmentRepository.findAll();
+        }
+        return appointmentRepository.findByUserId(actor.getId());
+    }
+
+    @Override
+    public Optional<Appointment> getAppointmentForUser(Long id, String username) {
+        User actor = requireUser(username);
+        return appointmentRepository.findById(id).filter(appointment -> canManage(appointment, actor));
+    }
+
+    @Override
     @Transactional
-    public void cancelAppointment(Long id) {
-        appointmentRepository.findById(id).ifPresent(this::deleteAndReleaseSlot);
+    public void cancelAppointment(Long id, String username) {
+        User actor = requireUser(username);
+        appointmentRepository.findById(id)
+                .filter(appointment -> canManage(appointment, actor))
+                .ifPresent(this::deleteAndReleaseSlot);
     }
 
     @Override
@@ -135,9 +153,26 @@ public class AppointmentServiceImpl implements AppointmentService {
         Long slotId = appointment.getTimeSlot() != null ? appointment.getTimeSlot().getId() : null;
         appointmentRepository.delete(appointment);
         appointmentRepository.flush();
-        if (slotId != null && !appointmentRepository.existsByTimeSlot_Id(slotId)) {
+        if (slotId != null) {
             timeSlotRepository.markAsAvailable(slotId);
         }
+    }
+
+    private User requireUser(String username) {
+        return userService.getUserByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    }
+
+    private static boolean isAdmin(User user) {
+        return user.getRole() != null && "ADMIN".equalsIgnoreCase(user.getRole());
+    }
+
+    private static boolean canManage(Appointment appointment, User actor) {
+        if (isAdmin(actor)) {
+            return true;
+        }
+        return appointment.getUser() != null && actor.getId() != null
+                && actor.getId().equals(appointment.getUser().getId());
     }
 
     private void scheduleConfirmationEmail(Appointment saved) {

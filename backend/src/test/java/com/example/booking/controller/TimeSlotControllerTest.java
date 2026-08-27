@@ -63,7 +63,7 @@ public class TimeSlotControllerTest {
         slot.setAvailable(true);
         slot.setAppointments(java.util.Collections.emptyList());
 
-        when(timeSlotService.getAllTimeSlots()).thenReturn(List.of(slot));
+        when(timeSlotService.getAvailableTimeSlots()).thenReturn(List.of(slot));
 
         mockMvc.perform(get("/api/timeslots"))
                 .andExpect(status().isOk())
@@ -112,6 +112,38 @@ public class TimeSlotControllerTest {
                 .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    public void testCreateTimeSlotDateTimeParseException() throws Exception {
+        String body = "{\"startTime\":\"not-a-date\",\"endTime\":\"2024-01-01T11:00:00Z\",\"available\":true}";
+
+        mockMvc.perform(post("/api/timeslots")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Invalid date/time format"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    public void testCreateTimeSlotUnexpectedException() throws Exception {
+        TimeSlotRequest req = new TimeSlotRequest();
+        req.setStartTime("2024-01-01T10:00:00Z");
+        req.setEndTime("2024-01-01T11:00:00Z");
+        req.setAvailable(true);
+
+        when(timeSlotService.createTimeSlot(any(TimeSlot.class)))
+                .thenThrow(new RuntimeException("unexpected failure"));
+
+        mockMvc.perform(post("/api/timeslots")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.message").value("Internal server error"));
     }
 
     @Test
@@ -209,5 +241,48 @@ public class TimeSlotControllerTest {
 
         mockMvc.perform(delete("/api/timeslots/1").with(csrf()))
                 .andExpect(status().is(409));
+    }
+
+    @Test
+    public void testTimeslotMutationsRequireAdmin() throws Exception {
+        TimeSlotRequest req = new TimeSlotRequest();
+        req.setStartTime("2024-01-01T10:00:00Z");
+        req.setEndTime("2024-01-01T11:00:00Z");
+        req.setAvailable(true);
+
+        mockMvc.perform(post("/api/timeslots")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isForbidden());
+
+        TimeSlot updated = new TimeSlot();
+        updated.setId(1L);
+        updated.setStartTime(OffsetDateTime.parse("2024-01-01T10:00:00Z"));
+        updated.setEndTime(OffsetDateTime.parse("2024-01-01T11:00:00Z"));
+        mockMvc.perform(put("/api/timeslots/1")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updated)))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(delete("/api/timeslots/1").with(csrf()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    public void testAdminGetAllTimeSlotsIncludesService() throws Exception {
+        TimeSlot slot = new TimeSlot();
+        slot.setId(1L);
+        slot.setStartTime(OffsetDateTime.parse("2024-01-01T10:00:00Z"));
+        slot.setEndTime(OffsetDateTime.parse("2024-01-01T11:00:00Z"));
+        slot.setAvailable(true);
+        slot.setAppointments(java.util.Collections.emptyList());
+        when(timeSlotService.getAllTimeSlots()).thenReturn(List.of(slot));
+
+        mockMvc.perform(get("/api/timeslots"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(1));
     }
 }

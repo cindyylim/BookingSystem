@@ -5,7 +5,9 @@ import com.example.booking.dto.LoginRequest;
 import com.example.booking.dto.RegisterRequest;
 import com.example.booking.exception.ResourceNotFoundException;
 import com.example.booking.model.User;
+import com.example.booking.security.JwtService;
 import com.example.booking.service.AuthService;
+import com.example.booking.util.JsonMaps;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
@@ -19,9 +21,11 @@ import java.util.Map;
 @RequestMapping("/api/auth")
 public class AuthController {
     private final AuthService authService;
+    private final JwtService jwtService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, JwtService jwtService) {
         this.authService = authService;
+        this.jwtService = jwtService;
     }
 
     @PostMapping("/register")
@@ -34,29 +38,17 @@ public class AuthController {
     public ResponseEntity<Map<String, Object>> login(@Valid @RequestBody LoginRequest req) {
         AuthResult result = authService.login(req);
         User user = result.getUser();
-        ResponseCookie jwtCookie = ResponseCookie.from("jwt", result.getToken())
-                .httpOnly(true)
-                .path("/")
-                .maxAge(24 * 60 * 60)
-                .build();
+        ResponseCookie jwtCookie = jwtCookie(result.getToken(), jwtService.getExpirationSeconds());
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, jwtCookie.toString())
                 .body(Map.of(
                         "message", "Login successful",
-                        "user", Map.of(
-                                "username", user.getUsername(),
-                                "email", user.getEmail(),
-                                "phone", user.getPhone(),
-                                "role", user.getRole())));
+                        "user", userView(user)));
     }
 
     @PostMapping("/logout")
     public ResponseEntity<Map<String, String>> logout() {
-        ResponseCookie jwtCookie = ResponseCookie.from("jwt", "")
-                .httpOnly(true)
-                .path("/")
-                .maxAge(0)
-                .build();
+        ResponseCookie jwtCookie = jwtCookie("", 0);
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, jwtCookie.toString())
                 .body(Map.of("message", "Logout successful"));
@@ -69,10 +61,22 @@ public class AuthController {
         }
         User user = authService.currentUser(principal.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        return ResponseEntity.ok(Map.of(
+        return ResponseEntity.ok(userView(user));
+    }
+
+    private static ResponseCookie jwtCookie(String token, long maxAgeSeconds) {
+        return ResponseCookie.from("jwt", token)
+                .httpOnly(true)
+                .path("/")
+                .maxAge(maxAgeSeconds)
+                .build();
+    }
+
+    private static Map<String, String> userView(User user) {
+        return JsonMaps.ofNullable(
                 "username", user.getUsername(),
                 "email", user.getEmail(),
                 "phone", user.getPhone(),
-                "role", user.getRole()));
+                "role", user.getRole());
     }
 }
