@@ -46,7 +46,7 @@ public class SecurityTest {
         // Inject secret manually since it's @Value
         ReflectionTestUtils.setField(jwtUtil, "secretString",
                 "v9y$B&E)H@McQfTjWmZq4t7w!z%C*F-JaNdRgUkXp2s5u8x/A?D(G+KbPeShVmYp");
-        ReflectionTestUtils.setField(jwtAuthenticationFilter, "jwtUtil", jwtUtil);
+        ReflectionTestUtils.setField(jwtAuthenticationFilter, "jwtService", jwtUtil);
     }
 
     @Test

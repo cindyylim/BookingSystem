@@ -1,26 +1,28 @@
 package com.example.booking.security;
 
 import com.example.booking.service.UserService;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.Cookie;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
-    @Autowired
-    private JwtUtil jwtUtil;
-    @Autowired
-    private UserService userService;
+    private final JwtService jwtService;
+    private final UserService userService;
+
+    public JwtAuthenticationFilter(JwtService jwtService, UserService userService) {
+        this.jwtService = jwtService;
+        this.userService = userService;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -32,20 +34,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             for (Cookie cookie : request.getCookies()) {
                 if ("jwt".equals(cookie.getName())) {
                     token = cookie.getValue();
-                    username = jwtUtil.extractUsername(token);
+                    username = jwtService.extractUsername(token);
                     break;
                 }
             }
         }
 
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            if (jwtUtil.validateToken(token)) {
-                if (userService.getUserByUsername(username).isPresent()) {
-                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                            username, null, null);
-                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
-                }
+            if (jwtService.validateToken(token) && userService.getUserByUsername(username).isPresent()) {
+                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                        username, null, null);
+                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                SecurityContextHolder.getContext().setAuthentication(authToken);
             }
         }
         filterChain.doFilter(request, response);

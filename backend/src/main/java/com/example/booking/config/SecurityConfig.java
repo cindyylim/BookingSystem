@@ -1,18 +1,27 @@
 package com.example.booking.config;
 
 import com.example.booking.security.JwtAuthenticationFilter;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 public class SecurityConfig {
-    @Autowired
-    private JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -20,9 +29,9 @@ public class SecurityConfig {
             .csrf().disable()
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/api/appointments/cancel/**").permitAll() // allow cancellation by token
-                .requestMatchers("/api/appointments").authenticated() // require authentication for booking
-                .requestMatchers("/api/appointments/**").authenticated() // require authentication for other appointment operations
+                .requestMatchers("/api/appointments/cancel/**").permitAll()
+                .requestMatchers("/api/appointments").authenticated()
+                .requestMatchers("/api/appointments/**").authenticated()
                 .requestMatchers("/api/user/**").authenticated()
                 .anyRequest().permitAll()
             )
@@ -31,4 +40,4 @@ public class SecurityConfig {
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
-} 
+}

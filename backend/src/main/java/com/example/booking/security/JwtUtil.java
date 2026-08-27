@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
 @Component
-public class JwtUtil {
+public class JwtUtil implements JwtService {
 
     @Value("${jwt.secret}")
     private String secretString;
@@ -23,6 +23,7 @@ public class JwtUtil {
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
+    @Override
     public String generateToken(String username) {
         return Jwts.builder()
                 .setSubject(username)
@@ -32,6 +33,7 @@ public class JwtUtil {
                 .compact();
     }
 
+    @Override
     public String extractUsername(String token) {
         try {
             return Jwts.parserBuilder()
@@ -46,6 +48,7 @@ public class JwtUtil {
         }
     }
 
+    @Override
     public boolean validateToken(String token) {
         try {
             Jwts.parserBuilder()

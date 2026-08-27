@@ -96,6 +96,18 @@ public class TimeSlotRepositoryTest {
     }
 
     @Test
+    void testMarkAsAvailable() {
+        testSlot.setAvailable(false);
+        TimeSlot saved = timeSlotRepository.save(testSlot);
+
+        int updated = timeSlotRepository.markAsAvailable(saved.getId());
+
+        assertEquals(1, updated);
+        TimeSlot reloaded = timeSlotRepository.findById(saved.getId()).orElseThrow();
+        assertTrue(reloaded.isAvailable());
+    }
+
+    @Test
     void testMarkAsUnavailableIfAvailable_OnlyAffectsSpecifiedSlot() {
         // Arrange - Create two available slots
         TimeSlot slot1 = timeSlotRepository.save(testSlot);

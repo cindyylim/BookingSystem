@@ -1,13 +1,20 @@
 package com.example.booking.service;
 
-import com.example.booking.model.Appointment;
+import com.example.booking.exception.ConflictException;
+import com.example.booking.exception.ResourceNotFoundException;
 import com.example.booking.model.TimeSlot;
+import com.example.booking.repository.AppointmentRepository;
 import com.example.booking.repository.TimeSlotRepository;
+import com.example.booking.service.impl.TimeSlotServiceImpl;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import java.time.OffsetDateTime;
 import java.util.Collections;
@@ -16,6 +23,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -24,8 +32,29 @@ class TimeSlotServiceTest {
     @Mock
     private TimeSlotRepository timeSlotRepository;
 
-    @InjectMocks
-    private TimeSlotService timeSlotService;
+    @Mock
+    private AppointmentRepository appointmentRepository;
+
+    private TimeSlotServiceImpl timeSlotService;
+
+    @BeforeEach
+    void setUp() {
+        PlatformTransactionManager transactionManager = new PlatformTransactionManager() {
+            @Override
+            public TransactionStatus getTransaction(TransactionDefinition definition) {
+                return new SimpleTransactionStatus();
+            }
+
+            @Override
+            public void commit(TransactionStatus status) {
+            }
+
+            @Override
+            public void rollback(TransactionStatus status) {
+            }
+        };
+        timeSlotService = new TimeSlotServiceImpl(timeSlotRepository, appointmentRepository, transactionManager);
+    }
 
     @Test
     void getAllTimeSlots() {
@@ -79,24 +108,9 @@ class TimeSlotServiceTest {
         TimeSlot slot = new TimeSlot();
         slot.setId(id);
         slot.setAvailable(true);
-        slot.setAppointments(Collections.emptyList());
 
         when(timeSlotRepository.findById(id)).thenReturn(Optional.of(slot));
-
-        timeSlotService.deleteTimeSlot(id);
-
-        verify(timeSlotRepository).deleteById(id);
-    }
-
-    @Test
-    void deleteTimeSlot_SuccessNoAppointments() {
-        Long id = 1L;
-        TimeSlot slot = new TimeSlot();
-        slot.setId(id);
-        slot.setAvailable(true);
-        slot.setAppointments(null);
-
-        when(timeSlotRepository.findById(id)).thenReturn(Optional.of(slot));
+        when(appointmentRepository.existsByTimeSlot_Id(id)).thenReturn(false);
 
         timeSlotService.deleteTimeSlot(id);
 
@@ -108,7 +122,7 @@ class TimeSlotServiceTest {
         Long id = 1L;
         when(timeSlotRepository.findById(id)).thenReturn(Optional.empty());
 
-        assertThrows(IllegalArgumentException.class, () -> timeSlotService.deleteTimeSlot(id));
+        assertThrows(ResourceNotFoundException.class, () -> timeSlotService.deleteTimeSlot(id));
         verify(timeSlotRepository, never()).deleteById(any());
     }
 
@@ -117,11 +131,11 @@ class TimeSlotServiceTest {
         Long id = 1L;
         TimeSlot slot = new TimeSlot();
         slot.setId(id);
-        slot.setAvailable(false); // Booked
+        slot.setAvailable(false);
 
         when(timeSlotRepository.findById(id)).thenReturn(Optional.of(slot));
 
-        assertThrows(IllegalStateException.class, () -> timeSlotService.deleteTimeSlot(id));
+        assertThrows(ConflictException.class, () -> timeSlotService.deleteTimeSlot(id));
         verify(timeSlotRepository, never()).deleteById(any());
     }
 
@@ -131,11 +145,11 @@ class TimeSlotServiceTest {
         TimeSlot slot = new TimeSlot();
         slot.setId(id);
         slot.setAvailable(true);
-        slot.setAppointments(List.of(new Appointment())); // Has appointments
 
         when(timeSlotRepository.findById(id)).thenReturn(Optional.of(slot));
+        when(appointmentRepository.existsByTimeSlot_Id(id)).thenReturn(true);
 
-        assertThrows(IllegalStateException.class, () -> timeSlotService.deleteTimeSlot(id));
+        assertThrows(ConflictException.class, () -> timeSlotService.deleteTimeSlot(id));
         verify(timeSlotRepository, never()).deleteById(any());
     }
 
@@ -157,7 +171,6 @@ class TimeSlotServiceTest {
     @Test
     void createTimeSlot_ValidationFailed_NullTimes() {
         TimeSlot slot = new TimeSlot();
-        // Missing start/end times
 
         assertThrows(IllegalArgumentException.class, () -> timeSlotService.createTimeSlot(slot));
         verify(timeSlotRepository, never()).save(any());
@@ -238,7 +251,7 @@ class TimeSlotServiceTest {
 
         when(timeSlotRepository.findById(id)).thenReturn(Optional.empty());
 
-        assertThrows(IllegalArgumentException.class, () -> timeSlotService.updateTimeSlot(id, update));
+        assertThrows(ResourceNotFoundException.class, () -> timeSlotService.updateTimeSlot(id, update));
     }
 
     @Test
@@ -257,81 +270,5 @@ class TimeSlotServiceTest {
 
         assertThrows(IllegalArgumentException.class, () -> timeSlotService.updateTimeSlot(id, update));
         verify(timeSlotRepository, never()).save(any());
-    }
-
-    @Test
-    void isOverlapping_True() {
-        TimeSlot slot = new TimeSlot();
-        slot.setStartTime(OffsetDateTime.now());
-        slot.setEndTime(OffsetDateTime.now().plusHours(1));
-
-        when(timeSlotRepository.findOverlappingSlots(any(), any())).thenReturn(List.of(new TimeSlot()));
-
-        assertTrue(timeSlotService.isOverlapping(slot));
-    }
-
-    @Test
-    void isOverlapping_False() {
-        TimeSlot slot = new TimeSlot();
-        slot.setStartTime(OffsetDateTime.now());
-        slot.setEndTime(OffsetDateTime.now().plusHours(1));
-
-        when(timeSlotRepository.findOverlappingSlots(any(), any())).thenReturn(Collections.emptyList());
-
-        assertFalse(timeSlotService.isOverlapping(slot));
-    }
-
-    @Test
-    void isOverlappingWithExclude_True() {
-        TimeSlot slot = new TimeSlot();
-        slot.setStartTime(OffsetDateTime.now());
-        slot.setEndTime(OffsetDateTime.now().plusHours(1));
-        Long excludeId = 123L;
-
-        when(timeSlotRepository.findOverlappingSlotsExcluding(any(), any(), eq(excludeId)))
-                .thenReturn(List.of(new TimeSlot()));
-
-        assertTrue(timeSlotService.isOverlapping(slot, excludeId));
-    }
-
-    @Test
-    void isOverlappingWithExclude_False() {
-        TimeSlot slot = new TimeSlot();
-        slot.setStartTime(OffsetDateTime.now());
-        slot.setEndTime(OffsetDateTime.now().plusHours(1));
-        Long excludeId = 123L;
-
-        when(timeSlotRepository.findOverlappingSlotsExcluding(any(), any(), eq(excludeId)))
-                .thenReturn(List.of());
-
-        assertFalse(timeSlotService.isOverlapping(slot, excludeId));
-    }
-
-    @Test
-    void isBooked_True() {
-        Long id = 1L;
-        TimeSlot slot = new TimeSlot();
-        slot.setAvailable(false);
-        when(timeSlotRepository.findById(id)).thenReturn(Optional.of(slot));
-
-        assertTrue(timeSlotService.isBooked(id));
-    }
-
-    @Test
-    void isBooked_False_WhenAvailable() {
-        Long id = 1L;
-        TimeSlot slot = new TimeSlot();
-        slot.setAvailable(true);
-        when(timeSlotRepository.findById(id)).thenReturn(Optional.of(slot));
-
-        assertFalse(timeSlotService.isBooked(id));
-    }
-
-    @Test
-    void isBooked_False_WhenNotFound() {
-        Long id = 1L;
-        when(timeSlotRepository.findById(id)).thenReturn(Optional.empty());
-
-        assertFalse(timeSlotService.isBooked(id));
     }
 }

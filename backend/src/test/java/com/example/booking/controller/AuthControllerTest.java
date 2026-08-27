@@ -1,7 +1,12 @@
 package com.example.booking.controller;
 
+import com.example.booking.dto.AuthResult;
+import com.example.booking.dto.LoginRequest;
+import com.example.booking.dto.RegisterRequest;
+import com.example.booking.exception.UnauthorizedException;
 import com.example.booking.model.User;
-import com.example.booking.security.JwtUtil;
+import com.example.booking.security.JwtService;
+import com.example.booking.service.AuthService;
 import com.example.booking.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -16,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -24,35 +30,36 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.booking.config.SecurityConfig;
+import com.example.booking.exception.RestExceptionHandler;
 import com.example.booking.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Import;
 
 @WebMvcTest(AuthController.class)
-@Import({ SecurityConfig.class, JwtAuthenticationFilter.class })
+@Import({ SecurityConfig.class, JwtAuthenticationFilter.class, RestExceptionHandler.class })
 public class AuthControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
 
     @MockBean
+    private AuthService authService;
+
+    @MockBean
     private UserService userService;
 
     @MockBean
-    private JwtUtil jwtUtil;
+    private JwtService jwtService;
 
     @Autowired
     private ObjectMapper objectMapper;
 
     @Test
     public void testRegister() throws Exception {
-        AuthController.RegisterRequest req = new AuthController.RegisterRequest();
+        RegisterRequest req = new RegisterRequest();
         req.setUsername("newuser");
         req.setPassword("password123");
         req.setEmail("new@example.com");
         req.setPhone("1234567890");
-
-        when(userService.getUserByUsername("newuser")).thenReturn(Optional.empty());
-        when(userService.getUserByEmail("new@example.com")).thenReturn(Optional.empty());
 
         mockMvc.perform(post("/api/auth/register")
                 .with(csrf())
@@ -63,16 +70,14 @@ public class AuthControllerTest {
 
     @Test
     public void testRegisterWithExistingUsername() throws Exception {
-        AuthController.RegisterRequest req = new AuthController.RegisterRequest();
+        RegisterRequest req = new RegisterRequest();
         req.setUsername("newuser");
         req.setPassword("password123");
         req.setEmail("new@example.com");
         req.setPhone("1234567890");
-        User user = new User();
-        user.setUsername("newuser");
 
-        when(userService.getUserByUsername("newuser")).thenReturn(Optional.of(user));
-        when(userService.getUserByEmail("new@example.com")).thenReturn(Optional.empty());
+        doThrow(new IllegalArgumentException("Username or email already exists"))
+                .when(authService).register(any(RegisterRequest.class));
 
         mockMvc.perform(post("/api/auth/register")
                 .with(csrf())
@@ -83,16 +88,14 @@ public class AuthControllerTest {
 
     @Test
     public void testRegisterWithExistingEmail() throws Exception {
-        AuthController.RegisterRequest req = new AuthController.RegisterRequest();
+        RegisterRequest req = new RegisterRequest();
         req.setUsername("newuser");
         req.setPassword("password123");
         req.setEmail("new@example.com");
         req.setPhone("1234567890");
-        User user = new User();
-        user.setEmail("new@example.com");
 
-        when(userService.getUserByUsername("newuser")).thenReturn(Optional.empty());
-        when(userService.getUserByEmail("new@example.com")).thenReturn(Optional.of(user));
+        doThrow(new IllegalArgumentException("Username or email already exists"))
+                .when(authService).register(any(RegisterRequest.class));
 
         mockMvc.perform(post("/api/auth/register")
                 .with(csrf())
@@ -105,15 +108,13 @@ public class AuthControllerTest {
     public void testLogin() throws Exception {
         User user = new User();
         user.setUsername("testuser");
-        user.setPassword("$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG");
         user.setEmail("test@example.com");
         user.setPhone("1234567890");
         user.setRole("USER");
 
-        when(userService.getUserByUsername("testuser")).thenReturn(Optional.of(user));
-        when(jwtUtil.generateToken("testuser")).thenReturn("fake-jwt-token");
+        when(authService.login(any(LoginRequest.class))).thenReturn(new AuthResult(user, "fake-jwt-token"));
 
-        AuthController.LoginRequest req = new AuthController.LoginRequest();
+        LoginRequest req = new LoginRequest();
         req.setUsername("testuser");
         req.setPassword("password");
 
@@ -127,16 +128,10 @@ public class AuthControllerTest {
 
     @Test
     public void testLoginInvalidCredentials() throws Exception {
-        User user = new User();
-        user.setUsername("testuser");
-        user.setPassword("$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG");
-        user.setEmail("test@example.com");
-        user.setPhone("1234567890");
-        user.setRole("USER");
+        when(authService.login(any(LoginRequest.class)))
+                .thenThrow(new UnauthorizedException("Invalid credentials"));
 
-        when(userService.getUserByUsername("testuser")).thenReturn(Optional.of(user));
-
-        AuthController.LoginRequest req = new AuthController.LoginRequest();
+        LoginRequest req = new LoginRequest();
         req.setUsername("testuser");
         req.setPassword("wrongpassword");
 
@@ -164,7 +159,7 @@ public class AuthControllerTest {
         user.setRole("USER");
         user.setAppointments(new ArrayList<>());
 
-        when(userService.getUserByUsername("testuser")).thenReturn(Optional.of(user));
+        when(authService.currentUser("testuser")).thenReturn(Optional.of(user));
 
         mockMvc.perform(get("/api/auth/me"))
                 .andExpect(status().isOk());

@@ -17,10 +17,12 @@ public class TimeSlotMapper {
         dto.setEndTime(timeSlot.getEndTime());
         dto.setAvailable(timeSlot.isAvailable());
 
-        List<AppointmentDTO> appointments = timeSlot.getAppointments()
-            .stream()
-            .map(TimeSlotMapper::mapAppointment)
-            .collect(Collectors.toList());
+        List<Appointment> source = timeSlot.getAppointments();
+        List<AppointmentDTO> appointments = source == null
+            ? List.of()
+            : source.stream()
+                .map(TimeSlotMapper::mapAppointment)
+                .collect(Collectors.toList());
 
         dto.setAppointments(appointments);
         return dto;

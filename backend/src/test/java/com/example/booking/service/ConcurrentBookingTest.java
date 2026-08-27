@@ -8,6 +8,7 @@ import com.example.booking.repository.TimeSlotRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
@@ -23,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * conditions.
  */
 @SpringBootTest
+@ActiveProfiles("test")
 public class ConcurrentBookingTest {
 
     @Autowired
@@ -69,7 +71,7 @@ public class ConcurrentBookingTest {
                     appointmentService.bookAppointment(appointment, timeSlotId, null);
                     successCount.incrementAndGet();
                     System.out.println("✓ User " + userId + " successfully booked the slot");
-                } catch (IllegalStateException e) {
+                } catch (com.example.booking.exception.ConflictException | IllegalStateException e) {
                     failureCount.incrementAndGet();
                     System.out.println("✗ User " + userId + " failed (slot unavailable)");
                 } catch (Exception e) {
@@ -137,8 +139,8 @@ public class ConcurrentBookingTest {
         appointment.setCustomerEmail("test@test.com");
         appointment.setCustomerPhone("555-0000");
 
-        assertThrows(IllegalStateException.class, () -> {
+        assertThrows(com.example.booking.exception.ConflictException.class, () -> {
             appointmentService.bookAppointment(appointment, savedSlot.getId(), null);
-        }, "Booking unavailable slot should throw IllegalStateException");
+        }, "Booking unavailable slot should throw ConflictException");
     }
 }

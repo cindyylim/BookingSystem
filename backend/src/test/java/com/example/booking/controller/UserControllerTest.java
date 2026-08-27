@@ -1,9 +1,10 @@
 package com.example.booking.controller;
 
+import com.example.booking.dto.UserAppointmentsResponse;
 import com.example.booking.model.Appointment;
 import com.example.booking.model.User;
-import com.example.booking.repository.AppointmentRepository;
-import com.example.booking.security.JwtUtil;
+import com.example.booking.security.JwtService;
+import com.example.booking.service.AppointmentService;
 import com.example.booking.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,12 +16,9 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -29,11 +27,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.booking.config.SecurityConfig;
+import com.example.booking.exception.RestExceptionHandler;
 import com.example.booking.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Import;
 
 @WebMvcTest(UserController.class)
-@Import({ SecurityConfig.class, JwtAuthenticationFilter.class })
+@Import({ SecurityConfig.class, JwtAuthenticationFilter.class, RestExceptionHandler.class })
 public class UserControllerTest {
 
     @Autowired
@@ -43,10 +42,10 @@ public class UserControllerTest {
     private UserService userService;
 
     @MockBean
-    private AppointmentRepository appointmentRepository;
+    private AppointmentService appointmentService;
 
     @MockBean
-    private JwtUtil jwtUtil;
+    private JwtService jwtService;
 
     @Test
     @WithMockUser(username = "testuser")
@@ -81,7 +80,7 @@ public class UserControllerTest {
         user.setUsername("testuser");
         user.setEmail("old@example.com");
 
-        when(userService.getUserByUsername("testuser")).thenReturn(Optional.of(user));
+        when(userService.updateProfile("testuser", "new@example.com", "0987654321")).thenReturn(user);
 
         mockMvc.perform(put("/api/user/profile")
                 .with(csrf())
@@ -93,7 +92,8 @@ public class UserControllerTest {
     @Test
     @WithMockUser(username = "testuser")
     public void testUpdateProfileNotFound() throws Exception {
-        when(userService.getUserByUsername("testuser")).thenReturn(Optional.empty());
+        when(userService.updateProfile("testuser", "new@example.com", "0987654321"))
+                .thenThrow(new com.example.booking.exception.ResourceNotFoundException("User not found"));
 
         mockMvc.perform(put("/api/user/profile")
                 .with(csrf())
@@ -113,7 +113,8 @@ public class UserControllerTest {
         appt.setStartTime(OffsetDateTime.now(ZoneOffset.UTC).plusDays(1));
 
         when(userService.getUserByUsername("testuser")).thenReturn(Optional.of(user));
-        when(appointmentRepository.findByUserId(1L)).thenReturn(List.of(appt));
+        when(appointmentService.getUpcomingAndHistoryForUser(1L))
+                .thenReturn(new UserAppointmentsResponse(List.of(appt), List.of()));
 
         mockMvc.perform(get("/api/user/appointments"))
                 .andExpect(status().isOk())
@@ -139,11 +140,9 @@ public class UserControllerTest {
         user.setId(1L);
         user.setUsername("testuser");
 
-        Appointment appt = new Appointment();
-        appt.setStartTime(OffsetDateTime.now(ZoneOffset.UTC).plusDays(1));
-
         when(userService.getUserByUsername("testuser")).thenReturn(Optional.of(user));
-        when(appointmentRepository.findByUserId(1L)).thenReturn(List.of());
+        when(appointmentService.getUpcomingAndHistoryForUser(1L))
+                .thenReturn(new UserAppointmentsResponse(List.of(), List.of()));
 
         mockMvc.perform(get("/api/user/appointments"))
                 .andExpect(status().isOk())

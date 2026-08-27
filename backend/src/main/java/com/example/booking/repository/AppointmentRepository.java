@@ -6,5 +6,8 @@ import java.util.List;
 
 public interface AppointmentRepository extends JpaRepository<Appointment, Long> {
     Appointment findByCancellationToken(String token);
+
     List<Appointment> findByUserId(Long userId);
-} 
+
+    boolean existsByTimeSlot_Id(Long timeSlotId);
+}

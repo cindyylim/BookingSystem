@@ -1,8 +1,10 @@
 package com.example.booking.controller;
 
+import com.example.booking.dto.AppointmentRequest;
+import com.example.booking.exception.ConflictException;
 import com.example.booking.model.Appointment;
 import com.example.booking.model.User;
-import com.example.booking.security.JwtUtil;
+import com.example.booking.security.JwtService;
 import com.example.booking.service.AppointmentService;
 import com.example.booking.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,7 +16,6 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -28,11 +29,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.booking.config.SecurityConfig;
+import com.example.booking.exception.RestExceptionHandler;
 import com.example.booking.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Import;
 
 @WebMvcTest(AppointmentController.class)
-@Import({ SecurityConfig.class, JwtAuthenticationFilter.class })
+@Import({ SecurityConfig.class, JwtAuthenticationFilter.class, RestExceptionHandler.class })
 public class AppointmentControllerTest {
 
     @Autowired
@@ -45,7 +47,7 @@ public class AppointmentControllerTest {
     private UserService userService;
 
     @MockBean
-    private JwtUtil jwtUtil;
+    private JwtService jwtService;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -80,20 +82,17 @@ public class AppointmentControllerTest {
     @Test
     @WithMockUser(username = "testuser")
     public void testBookAppointment() throws Exception {
-        AppointmentController.AppointmentRequest req = new AppointmentController.AppointmentRequest();
+        AppointmentRequest req = new AppointmentRequest();
         req.setCustomerName("John Doe");
         req.setTimeSlotId(1L);
         req.setService("Consultation");
 
-        User user = new User();
-        user.setUsername("testuser");
-        
         Appointment booked = new Appointment();
         booked.setId(1L);
         booked.setCustomerName("testuser");
 
-        when(userService.getUserByUsername("testuser")).thenReturn(Optional.of(user));
-        when(appointmentService.bookAppointment(any(Appointment.class), eq(1L), eq(user))).thenReturn(booked);
+        when(appointmentService.bookAppointmentForUser(eq("testuser"), any(AppointmentRequest.class)))
+                .thenReturn(booked);
 
         mockMvc.perform(post("/api/appointments")
                 .with(csrf())
@@ -106,16 +105,10 @@ public class AppointmentControllerTest {
     @Test
     @WithMockUser(username = "testuser")
     public void testBookAppointmentIllegalArgumentException() throws Exception {
-        AppointmentController.AppointmentRequest req = new AppointmentController.AppointmentRequest();
-        req.setCustomerName("John Doe");
+        AppointmentRequest req = new AppointmentRequest();
         req.setTimeSlotId(1L);
-        req.setService("Consultation");
 
-        User user = new User();
-        user.setUsername("testuser");
-
-        when(userService.getUserByUsername("testuser")).thenReturn(Optional.of(user));
-        when(appointmentService.bookAppointment(any(Appointment.class), eq(1L), eq(user)))
+        when(appointmentService.bookAppointmentForUser(eq("testuser"), any(AppointmentRequest.class)))
                 .thenThrow(new IllegalArgumentException("Time slot not found"));
 
         mockMvc.perform(post("/api/appointments")
@@ -128,17 +121,11 @@ public class AppointmentControllerTest {
     @Test
     @WithMockUser(username = "testuser")
     public void testBookAppointmentIllegalStateException() throws Exception {
-        AppointmentController.AppointmentRequest req = new AppointmentController.AppointmentRequest();
-        req.setCustomerName("John Doe");
+        AppointmentRequest req = new AppointmentRequest();
         req.setTimeSlotId(1L);
-        req.setService("Consultation");
 
-        User user = new User();
-        user.setUsername("testuser");
-
-        when(userService.getUserByUsername("testuser")).thenReturn(Optional.of(user));
-        when(appointmentService.bookAppointment(any(Appointment.class), eq(1L), eq(user)))
-                .thenThrow(new IllegalStateException("Time slot is not available"));
+        when(appointmentService.bookAppointmentForUser(eq("testuser"), any(AppointmentRequest.class)))
+                .thenThrow(new ConflictException("Time slot is not available"));
 
         mockMvc.perform(post("/api/appointments")
                 .with(csrf())
@@ -150,16 +137,10 @@ public class AppointmentControllerTest {
     @Test
     @WithMockUser(username = "testuser")
     public void testBookAppointmentRuntimeException() throws Exception {
-        AppointmentController.AppointmentRequest req = new AppointmentController.AppointmentRequest();
-        req.setCustomerName("John Doe");
+        AppointmentRequest req = new AppointmentRequest();
         req.setTimeSlotId(1L);
-        req.setService("Consultation");
 
-        User user = new User();
-        user.setUsername("testuser");
-
-        when(userService.getUserByUsername("testuser")).thenReturn(Optional.of(user));
-        when(appointmentService.bookAppointment(any(Appointment.class), eq(1L), eq(user)))
+        when(appointmentService.bookAppointmentForUser(eq("testuser"), any(AppointmentRequest.class)))
                 .thenThrow(new RuntimeException("Error booking appointment"));
 
         mockMvc.perform(post("/api/appointments")
@@ -172,15 +153,10 @@ public class AppointmentControllerTest {
     @Test
     @WithMockUser(username = "testuser")
     public void testBookAppointmentAuthenticated() throws Exception {
-        AppointmentController.AppointmentRequest req = new AppointmentController.AppointmentRequest();
-        req.setCustomerName("John Doe");
+        AppointmentRequest req = new AppointmentRequest();
         req.setTimeSlotId(1L);
 
-        User user = new User();
-        user.setUsername("testuser");
-
-        when(userService.getUserByUsername("testuser")).thenReturn(Optional.of(user));
-        when(appointmentService.bookAppointment(any(Appointment.class), eq(1L), eq(user)))
+        when(appointmentService.bookAppointmentForUser(eq("testuser"), any(AppointmentRequest.class)))
                 .thenReturn(new Appointment());
 
         mockMvc.perform(post("/api/appointments")

@@ -1,8 +1,5 @@
 package com.example.booking.dto;
 
-import com.example.booking.controller.AppointmentController;
-import com.example.booking.controller.AuthController;
-import com.example.booking.controller.TimeSlotController;
 import com.example.booking.mapper.TimeSlotMapper;
 import com.example.booking.model.Appointment;
 import com.example.booking.model.TimeSlot;
@@ -83,14 +80,24 @@ public class DtoMapperTest {
     }
 
     @Test
+    public void testMapperNullAppointments() {
+        TimeSlot ts = new TimeSlot();
+        ts.setId(1L);
+        ts.setAppointments(null);
+
+        TimeSlotDTO dto = TimeSlotMapper.toDTO(ts);
+        assertTrue(dto.getAppointments().isEmpty());
+    }
+
+    @Test
     public void testAuthRequestDTOs() {
-        AuthController.LoginRequest login = new AuthController.LoginRequest();
+        LoginRequest login = new LoginRequest();
         login.setUsername("user");
         login.setPassword("pass");
         assertEquals("user", login.getUsername());
         assertEquals("pass", login.getPassword());
 
-        AuthController.RegisterRequest reg = new AuthController.RegisterRequest();
+        RegisterRequest reg = new RegisterRequest();
         reg.setUsername("user");
         reg.setPassword("pass");
         reg.setEmail("email");
@@ -103,7 +110,7 @@ public class DtoMapperTest {
 
     @Test
     public void testAppointmentRequestDTO() {
-        AppointmentController.AppointmentRequest req = new AppointmentController.AppointmentRequest();
+        AppointmentRequest req = new AppointmentRequest();
         req.setCustomerName("Name");
         req.setCustomerEmail("Email");
         req.setCustomerPhone("Phone");
@@ -121,7 +128,7 @@ public class DtoMapperTest {
 
     @Test
     public void testTimeSlotRequestDTO() {
-        TimeSlotController.TimeSlotRequest req = new TimeSlotController.TimeSlotRequest();
+        TimeSlotRequest req = new TimeSlotRequest();
         req.setStartTime("start");
         req.setEndTime("end");
         req.setAvailable(true);

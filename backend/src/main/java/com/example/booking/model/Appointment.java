@@ -29,7 +29,7 @@ public class Appointment {
     private User user;
 
     @ManyToOne
-    @JoinColumn(name = "time_slot_id") // This creates the foreign key column in your DB
+    @JoinColumn(name = "time_slot_id", unique = true)
     @JsonBackReference("timeslot-appointments")
     private TimeSlot timeSlot;
 

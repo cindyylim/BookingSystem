@@ -1,8 +1,10 @@
 package com.example.booking.controller;
 
+import com.example.booking.dto.TimeSlotRequest;
+import com.example.booking.exception.ConflictException;
+import com.example.booking.exception.ResourceNotFoundException;
 import com.example.booking.model.TimeSlot;
-import com.example.booking.repository.TimeSlotRepository;
-import com.example.booking.security.JwtUtil;
+import com.example.booking.security.JwtService;
 import com.example.booking.service.TimeSlotService;
 import com.example.booking.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,6 +23,7 @@ import java.util.Optional;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -28,18 +31,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.booking.config.SecurityConfig;
+import com.example.booking.exception.RestExceptionHandler;
 import com.example.booking.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Import;
 
 @WebMvcTest(TimeSlotController.class)
-@Import({ SecurityConfig.class, JwtAuthenticationFilter.class })
+@Import({ SecurityConfig.class, JwtAuthenticationFilter.class, RestExceptionHandler.class })
 public class TimeSlotControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
-
-    @MockBean
-    private TimeSlotRepository timeSlotRepository;
 
     @MockBean
     private TimeSlotService timeSlotService;
@@ -48,7 +49,7 @@ public class TimeSlotControllerTest {
     private UserService userService;
 
     @MockBean
-    private JwtUtil jwtUtil;
+    private JwtService jwtService;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -62,7 +63,7 @@ public class TimeSlotControllerTest {
         slot.setAvailable(true);
         slot.setAppointments(java.util.Collections.emptyList());
 
-        when(timeSlotRepository.findAll()).thenReturn(List.of(slot));
+        when(timeSlotService.getAllTimeSlots()).thenReturn(List.of(slot));
 
         mockMvc.perform(get("/api/timeslots"))
                 .andExpect(status().isOk())
@@ -77,7 +78,7 @@ public class TimeSlotControllerTest {
         slot.setEndTime(OffsetDateTime.parse("2024-01-01T11:00:00Z"));
         slot.setAppointments(java.util.Collections.emptyList());
 
-        when(timeSlotRepository.findById(1L)).thenReturn(Optional.of(slot));
+        when(timeSlotService.getTimeSlot(1L)).thenReturn(Optional.of(slot));
 
         mockMvc.perform(get("/api/timeslots/1"))
                 .andExpect(status().isOk())
@@ -86,7 +87,7 @@ public class TimeSlotControllerTest {
 
     @Test
     public void testGetTimeSlotNotFound() throws Exception {
-        when(timeSlotRepository.findById(1L)).thenReturn(Optional.empty());
+        when(timeSlotService.getTimeSlot(1L)).thenReturn(Optional.empty());
 
         mockMvc.perform(get("/api/timeslots/1"))
                 .andExpect(status().is(404));
@@ -95,7 +96,7 @@ public class TimeSlotControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     public void testCreateTimeSlot() throws Exception {
-        TimeSlotController.TimeSlotRequest req = new TimeSlotController.TimeSlotRequest();
+        TimeSlotRequest req = new TimeSlotRequest();
         req.setStartTime("2024-01-01T10:00:00Z");
         req.setEndTime("2024-01-01T11:00:00Z");
         req.setAvailable(true);
@@ -103,7 +104,6 @@ public class TimeSlotControllerTest {
         TimeSlot created = new TimeSlot();
         created.setId(1L);
 
-        when(timeSlotService.isOverlapping(any(TimeSlot.class))).thenReturn(false);
         when(timeSlotService.createTimeSlot(any(TimeSlot.class))).thenReturn(created);
 
         mockMvc.perform(post("/api/timeslots")
@@ -117,15 +117,13 @@ public class TimeSlotControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     public void testCreateTimeSlotIsOverlapping() throws Exception {
-        TimeSlotController.TimeSlotRequest req = new TimeSlotController.TimeSlotRequest();
+        TimeSlotRequest req = new TimeSlotRequest();
         req.setStartTime("2024-01-01T10:00:00Z");
         req.setEndTime("2024-01-01T11:00:00Z");
         req.setAvailable(true);
 
-        TimeSlot created = new TimeSlot();
-        created.setId(1L);
-
-        when(timeSlotService.isOverlapping(any(TimeSlot.class))).thenReturn(true);
+        when(timeSlotService.createTimeSlot(any(TimeSlot.class)))
+                .thenThrow(new IllegalArgumentException("Time slot overlaps with an existing slot."));
 
         mockMvc.perform(post("/api/timeslots")
                 .with(csrf())
@@ -144,7 +142,6 @@ public class TimeSlotControllerTest {
         updated.setEndTime(OffsetDateTime.parse("2024-01-01T11:00:00Z"));
         updated.setAppointments(java.util.Collections.emptyList());
 
-        when(timeSlotService.isOverlapping(any(TimeSlot.class), eq(1L))).thenReturn(false);
         when(timeSlotService.updateTimeSlot(eq(1L), any(TimeSlot.class))).thenReturn(updated);
 
         mockMvc.perform(put("/api/timeslots/1")
@@ -165,7 +162,8 @@ public class TimeSlotControllerTest {
         updated.setEndTime(OffsetDateTime.parse("2024-01-01T11:00:00Z"));
         updated.setAppointments(java.util.Collections.emptyList());
 
-        when(timeSlotService.isOverlapping(any(TimeSlot.class), eq(1L))).thenReturn(true);
+        when(timeSlotService.updateTimeSlot(eq(1L), any(TimeSlot.class)))
+                .thenThrow(new IllegalArgumentException("Updated time slot overlaps with an existing slot."));
 
         mockMvc.perform(put("/api/timeslots/1")
                 .with(csrf())
@@ -184,9 +182,8 @@ public class TimeSlotControllerTest {
         updated.setEndTime(OffsetDateTime.parse("2024-01-01T11:00:00Z"));
         updated.setAppointments(java.util.Collections.emptyList());
 
-        when(timeSlotService.isOverlapping(any(TimeSlot.class), eq(1L))).thenReturn(false);
         when(timeSlotService.updateTimeSlot(eq(1L), any(TimeSlot.class)))
-                .thenThrow(new IllegalArgumentException("TimeSlot not found"));
+                .thenThrow(new ResourceNotFoundException("TimeSlot not found"));
 
         mockMvc.perform(put("/api/timeslots/1")
                 .with(csrf())
@@ -198,7 +195,6 @@ public class TimeSlotControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     public void testDeleteTimeSlot() throws Exception {
-        when(timeSlotService.isBooked(1L)).thenReturn(false);
         doNothing().when(timeSlotService).deleteTimeSlot(1L);
 
         mockMvc.perform(delete("/api/timeslots/1").with(csrf()))
@@ -208,9 +204,10 @@ public class TimeSlotControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     public void testDeleteTimeSlotIsBooked() throws Exception {
-        when(timeSlotService.isBooked(1L)).thenReturn(true);
+        doThrow(new ConflictException("Cannot delete a time slot that is already booked."))
+                .when(timeSlotService).deleteTimeSlot(1L);
 
         mockMvc.perform(delete("/api/timeslots/1").with(csrf()))
-                .andExpect(status().is(400));
+                .andExpect(status().is(409));
     }
 }

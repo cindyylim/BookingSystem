@@ -1,7 +1,9 @@
 package com.example.booking.service;
 
+import com.example.booking.exception.ResourceNotFoundException;
 import com.example.booking.model.User;
 import com.example.booking.repository.UserRepository;
+import com.example.booking.service.impl.UserServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -20,7 +22,7 @@ public class UserServiceTest {
     private UserRepository userRepository;
 
     @InjectMocks
-    private UserService userService;
+    private UserServiceImpl userService;
 
     @Test
     void testGetUserByUsername() {
@@ -70,5 +72,28 @@ public class UserServiceTest {
 
         userService.updateUser(user);
         verify(userRepository).save(user);
+    }
+
+    @Test
+    void testUpdateProfile() {
+        User user = new User();
+        user.setUsername("testuser");
+        user.setEmail("old@example.com");
+        user.setPhone("111");
+
+        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
+        when(userRepository.save(user)).thenReturn(user);
+
+        User updated = userService.updateProfile("testuser", "new@example.com", "222");
+
+        assertEquals("new@example.com", updated.getEmail());
+        assertEquals("222", updated.getPhone());
+    }
+
+    @Test
+    void testUpdateProfileNotFound() {
+        when(userRepository.findByUsername("missing")).thenReturn(Optional.empty());
+        assertThrows(ResourceNotFoundException.class,
+                () -> userService.updateProfile("missing", "a@b.com", "123"));
     }
 }
