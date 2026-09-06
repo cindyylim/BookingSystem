@@ -11,7 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
-
+import com.example.booking.exception.ConflictException;
 import java.time.OffsetDateTime;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -76,7 +76,7 @@ public class ConcurrentBookingTest {
                     appointmentService.bookAppointment(appointment, timeSlotId, booker);
                     successCount.incrementAndGet();
                     System.out.println("✓ User " + userId + " successfully booked the slot");
-                } catch (com.example.booking.exception.ConflictException | IllegalStateException e) {
+                } catch (ConflictException | IllegalStateException e) {
                     failureCount.incrementAndGet();
                     System.out.println("✗ User " + userId + " failed (slot unavailable)");
                 } catch (Exception e) {
@@ -88,14 +88,8 @@ public class ConcurrentBookingTest {
             });
         }
 
-        // Wait for all threads to complete
         latch.await();
         executor.shutdown();
-
-        // Verify: Only ONE booking should succeed
-        System.out.println("\n=== Test Results ===");
-        System.out.println("Successful bookings: " + successCount.get());
-        System.out.println("Failed bookings: " + failureCount.get());
 
         assertEquals(1, successCount.get(), "Exactly ONE user should successfully book the slot");
         assertEquals(numThreads - 1, failureCount.get(), "All other users should fail");
@@ -144,7 +138,7 @@ public class ConcurrentBookingTest {
         appointment.setCustomerEmail("test@test.com");
         appointment.setCustomerPhone("555-0000");
 
-        assertThrows(com.example.booking.exception.ConflictException.class, () -> {
+        assertThrows(ConflictException.class, () -> {
             appointmentService.bookAppointment(appointment, savedSlot.getId(),
                     saveUser("unavailable-slot-user", "unavailable-slot@test.com"));
         }, "Booking unavailable slot should throw ConflictException");

@@ -25,6 +25,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -307,10 +308,11 @@ class TimeSlotServiceTest {
         CountDownLatch done = new CountDownLatch(2);
         AtomicInteger success = new AtomicInteger();
         AtomicInteger failure = new AtomicInteger();
+        AtomicReference<TimeSlot> created = new AtomicReference<>();
 
         executor.submit(() -> {
             try {
-                timeSlotService.createTimeSlot(first);
+                created.set(timeSlotService.createTimeSlot(first));
                 success.incrementAndGet();
             } catch (Exception e) {
                 failure.incrementAndGet();
@@ -324,7 +326,7 @@ class TimeSlotServiceTest {
                     failure.incrementAndGet();
                     return;
                 }
-                timeSlotService.createTimeSlot(second);
+                created.set(timeSlotService.createTimeSlot(second));
                 success.incrementAndGet();
             } catch (Exception e) {
                 failure.incrementAndGet();
@@ -340,6 +342,9 @@ class TimeSlotServiceTest {
 
         assertEquals(1, success.get());
         assertEquals(1, failure.get());
+        assertSame(first, created.get());
+        verify(timeSlotRepository).save(first);
+        verify(timeSlotRepository, never()).save(second);
     }
 
     @Test
@@ -383,10 +388,11 @@ class TimeSlotServiceTest {
         CountDownLatch done = new CountDownLatch(2);
         AtomicInteger success = new AtomicInteger();
         AtomicInteger failure = new AtomicInteger();
+        AtomicReference<TimeSlot> updated = new AtomicReference<>();
 
         executor.submit(() -> {
             try {
-                timeSlotService.updateTimeSlot(1L, updateA);
+                updated.set(timeSlotService.updateTimeSlot(1L, updateA));
                 success.incrementAndGet();
             } catch (Exception e) {
                 failure.incrementAndGet();
@@ -400,7 +406,7 @@ class TimeSlotServiceTest {
                     failure.incrementAndGet();
                     return;
                 }
-                timeSlotService.updateTimeSlot(2L, updateB);
+                updated.set(timeSlotService.updateTimeSlot(2L, updateB));
                 success.incrementAndGet();
             } catch (Exception e) {
                 failure.incrementAndGet();
@@ -415,5 +421,10 @@ class TimeSlotServiceTest {
 
         assertEquals(1, success.get());
         assertEquals(1, failure.get());
+        assertSame(existingA, updated.get());
+        assertEquals(updateA.getStartTime(), updated.get().getStartTime());
+        assertEquals(updateA.getEndTime(), updated.get().getEndTime());
+        verify(timeSlotRepository).save(existingA);
+        verify(timeSlotRepository, never()).save(existingB);
     }
 }

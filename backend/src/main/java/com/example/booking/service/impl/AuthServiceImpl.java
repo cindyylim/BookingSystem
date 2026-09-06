@@ -30,8 +30,20 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public void register(RegisterRequest request) {
-        if (userService.getUserByUsername(request.getUsername()).isPresent()
-                || userService.getUserByEmail(request.getEmail()).isPresent()) {
+        if (request.getUsername().isEmpty()) {
+            throw new IllegalArgumentException("Username is required");
+        }
+        if (request.getEmail().isEmpty()) {
+            throw new IllegalArgumentException("Email is required");
+        }
+        if (request.getPassword().isEmpty()) {
+            throw new IllegalArgumentException("Password is required");
+        }
+        if (request.getPhone().isEmpty()) {
+            throw new IllegalArgumentException("Phone is required");
+        }
+
+        if (userService.getUserByUsername(request.getUsername()).isPresent() || userService.getUserByEmail(request.getEmail()).isPresent()) {
             throw new IllegalArgumentException("Username or email already exists");
         }
 

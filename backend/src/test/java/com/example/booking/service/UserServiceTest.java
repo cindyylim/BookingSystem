@@ -86,8 +86,11 @@ public class UserServiceTest {
 
         User updated = userService.updateProfile("testuser", "new@example.com", "222");
 
+        assertEquals("testuser", updated.getUsername());
         assertEquals("new@example.com", updated.getEmail());
         assertEquals("222", updated.getPhone());
+        verify(userRepository).findByUsername("testuser");
+        verify(userRepository).save(user);
     }
 
     @Test

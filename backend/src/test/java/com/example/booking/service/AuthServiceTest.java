@@ -49,17 +49,17 @@ class AuthServiceTest {
         authService.register(request);
 
         verify(userService).createUser(any(User.class));
+        verify(passwordEncoder).encode("secret1");
     }
 
     @Test
     void registerRejectsDuplicate() {
-        RegisterRequest request = new RegisterRequest();
-        request.setUsername("new");
-        request.setEmail("new@example.com");
+        RegisterRequest request = validRegisterRequest();
 
         when(userService.getUserByUsername("new")).thenReturn(Optional.of(new User()));
 
-        assertThrows(IllegalArgumentException.class, () -> authService.register(request));
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> authService.register(request));
+        assertEquals("Username or email already exists", ex.getMessage());
         verify(userService, never()).createUser(any());
     }
 
@@ -81,16 +81,53 @@ class AuthServiceTest {
     }
 
     @Test
-    void registerRejectsDuplicateEmailWhenUsernameEmpty() {
-        RegisterRequest request = new RegisterRequest();
-        request.setUsername("");
-        request.setEmail("taken@example.com");
-
-        when(userService.getUserByUsername("")).thenReturn(Optional.empty());
-        when(userService.getUserByEmail("taken@example.com")).thenReturn(Optional.of(new User()));
+    void registerRejectsDuplicateEmail() {
+        RegisterRequest request = validRegisterRequest();
+        when(userService.getUserByUsername("new")).thenReturn(Optional.empty());
+        when(userService.getUserByEmail("new@example.com")).thenReturn(Optional.of(new User()));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> authService.register(request));
         assertEquals("Username or email already exists", ex.getMessage());
+        verify(userService, never()).createUser(any());
+    }
+
+    @Test
+    void registerRejectsEmptyUsername() {
+        RegisterRequest request = validRegisterRequest();
+        request.setUsername("");
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> authService.register(request));
+        assertEquals("Username is required", ex.getMessage());
+        verify(userService, never()).createUser(any());
+    }
+
+    @Test
+    void registerRejectsEmptyEmail() {
+        RegisterRequest request = validRegisterRequest();
+        request.setEmail("");
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> authService.register(request));
+        assertEquals("Email is required", ex.getMessage());
+        verify(userService, never()).createUser(any());
+    }
+
+    @Test
+    void registerRejectsEmptyPassword() {
+        RegisterRequest request = validRegisterRequest();
+        request.setPassword("");
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> authService.register(request));
+        assertEquals("Password is required", ex.getMessage());
+        verify(userService, never()).createUser(any());
+    }
+
+    @Test
+    void registerRejectsEmptyPhone() {
+        RegisterRequest request = validRegisterRequest();
+        request.setPhone("");
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> authService.register(request));
+        assertEquals("Phone is required", ex.getMessage());
         verify(userService, never()).createUser(any());
     }
 
@@ -104,18 +141,6 @@ class AuthServiceTest {
 
         assertThrows(UnauthorizedException.class, () -> authService.login(request));
         verify(jwtService, never()).generateToken(any());
-    }
-
-    @Test
-    void currentUserDelegatesToUserService() {
-        User user = new User();
-        user.setUsername("u");
-        when(userService.getUserByUsername("u")).thenReturn(Optional.of(user));
-
-        Optional<User> result = authService.currentUser("u");
-
-        assertTrue(result.isPresent());
-        assertEquals("u", result.get().getUsername());
     }
 
     @Test
@@ -149,5 +174,26 @@ class AuthServiceTest {
         request.setPassword("pw");
 
         assertThrows(UnauthorizedException.class, () -> authService.login(request));
+    }
+
+    @Test
+    void currentUserDelegatesToUserService() {
+        User user = new User();
+        user.setUsername("u");
+        when(userService.getUserByUsername("u")).thenReturn(Optional.of(user));
+
+        Optional<User> result = authService.currentUser("u");
+
+        assertTrue(result.isPresent());
+        assertEquals("u", result.get().getUsername());
+    }
+
+    private static RegisterRequest validRegisterRequest() {
+        RegisterRequest request = new RegisterRequest();
+        request.setUsername("new");
+        request.setPassword("secret1");
+        request.setEmail("new@example.com");
+        request.setPhone("1234567890");
+        return request;
     }
 }
