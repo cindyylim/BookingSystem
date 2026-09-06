@@ -2,8 +2,10 @@ package com.example.booking.service;
 
 import com.example.booking.model.Appointment;
 import com.example.booking.model.TimeSlot;
+import com.example.booking.model.User;
 import com.example.booking.repository.AppointmentRepository;
 import com.example.booking.repository.TimeSlotRepository;
+import com.example.booking.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -35,6 +37,9 @@ class AppointmentConfirmationTransactionTest {
     private AppointmentRepository appointmentRepository;
 
     @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
     private PlatformTransactionManager transactionManager;
 
     @MockBean
@@ -43,7 +48,8 @@ class AppointmentConfirmationTransactionTest {
     @Test
     void confirmationEmailSentAfterSuccessfulCommit() {
         TimeSlot slot = saveSlot(41);
-        appointmentService.bookAppointment(sampleAppointment(), slot.getId(), null);
+        User user = saveUser("txn-commit", "txn-commit@test.com");
+        appointmentService.bookAppointment(sampleAppointment(), slot.getId(), user);
         verify(notificationService).sendAppointmentConfirmation(any(Appointment.class));
     }
 
@@ -53,7 +59,7 @@ class AppointmentConfirmationTransactionTest {
         TransactionTemplate template = new TransactionTemplate(transactionManager);
 
         assertThrows(IllegalStateException.class, () -> template.executeWithoutResult(status -> {
-            appointmentService.bookAppointment(sampleAppointment(), slot.getId(), null);
+            appointmentService.bookAppointment(sampleAppointment(), slot.getId(), saveUser("txn-rollback", "txn-rollback@test.com"));
             verify(notificationService, never()).sendAppointmentConfirmation(any());
             throw new IllegalStateException("force rollback");
         }));
@@ -80,5 +86,15 @@ class AppointmentConfirmationTransactionTest {
         appointment.setLocation("Office");
         appointment.setService("Consult");
         return appointment;
+    }
+
+    private User saveUser(String username, String email) {
+        User user = new User();
+        user.setUsername(username);
+        user.setPassword("secret");
+        user.setEmail(email);
+        user.setPhone("555-0200");
+        user.setRole("USER");
+        return userRepository.save(user);
     }
 }

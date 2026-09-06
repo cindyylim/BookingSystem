@@ -2,7 +2,9 @@ package com.example.booking.service;
 
 import com.example.booking.model.Appointment;
 import com.example.booking.model.TimeSlot;
+import com.example.booking.model.User;
 import com.example.booking.repository.TimeSlotRepository;
+import com.example.booking.repository.UserRepository;
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
 import org.junit.jupiter.api.Test;
@@ -32,6 +34,9 @@ class AppointmentBookingEmailFailureTest {
     @Autowired
     private TimeSlotRepository timeSlotRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
     @MockBean
     private JavaMailSender mailSender;
 
@@ -55,9 +60,20 @@ class AppointmentBookingEmailFailureTest {
         appointment.setLocation("Office");
         appointment.setService("Consult");
 
-        Appointment saved = appointmentService.bookAppointment(appointment, slot.getId(), null);
+        Appointment saved = appointmentService.bookAppointment(appointment, slot.getId(),
+                saveUser("mailfail-user", "mailfail@test.com"));
 
         assertNotNull(saved.getId());
         assertFalse(timeSlotRepository.findById(slot.getId()).orElseThrow().isAvailable());
+    }
+
+    private User saveUser(String username, String email) {
+        User user = new User();
+        user.setUsername(username);
+        user.setPassword("secret");
+        user.setEmail(email);
+        user.setPhone("555-0300");
+        user.setRole("USER");
+        return userRepository.save(user);
     }
 }

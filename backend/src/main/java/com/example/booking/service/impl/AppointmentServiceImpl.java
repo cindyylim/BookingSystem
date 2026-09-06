@@ -42,13 +42,23 @@ public class AppointmentServiceImpl implements AppointmentService {
     }
 
     @Override
+    public List<Appointment> getAppointmentsVisibleTo(String username) {
+        User actor = requireUser(username);
+        if (isAdmin(actor)) {
+            return appointmentRepository.findAll();
+        }
+        return appointmentRepository.findByUserId(actor.getId());
+    }
+
+    @Override
     public List<Appointment> getAllAppointments() {
         return appointmentRepository.findAll();
     }
 
     @Override
-    public List<Appointment> getAppointmentsForUser(Long userId) {
-        return appointmentRepository.findByUserId(userId);
+    public Optional<Appointment> getAppointmentForUser(Long id, String username) {
+        User actor = requireUser(username);
+        return appointmentRepository.findById(id).filter(appointment -> canManage(appointment, actor));
     }
 
     @Override
@@ -65,20 +75,15 @@ public class AppointmentServiceImpl implements AppointmentService {
     }
 
     @Override
-    public Optional<Appointment> getAppointment(Long id) {
-        return appointmentRepository.findById(id);
-    }
-
-    @Override
     @Transactional
     public Appointment bookAppointmentForUser(String username, AppointmentRequest request) {
         User user = userService.getUserByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         Appointment appointment = new Appointment();
-        appointment.setCustomerName(user.getUsername());
-        appointment.setCustomerEmail(user.getEmail() != null ? user.getEmail() : request.getCustomerEmail());
-        appointment.setCustomerPhone(user.getPhone() != null ? user.getPhone() : request.getCustomerPhone());
+        appointment.setCustomerName(request.getCustomerName());
+        appointment.setCustomerEmail(request.getCustomerEmail());
+        appointment.setCustomerPhone(request.getCustomerPhone());
         appointment.setLocation(request.getLocation());
         appointment.setService(request.getService());
 
@@ -88,6 +93,11 @@ public class AppointmentServiceImpl implements AppointmentService {
     @Override
     @Transactional
     public Appointment bookAppointment(Appointment appointment, Long timeSlotId, User user) {
+        if (user == null) {
+            throw new IllegalArgumentException("User is required");
+        }
+        User actor = requireUser(user.getUsername());
+
         int updated = timeSlotRepository.markAsUnavailableIfAvailable(timeSlotId);
 
         if (updated == 0) {
@@ -102,31 +112,13 @@ public class AppointmentServiceImpl implements AppointmentService {
         appointment.setTimeSlot(timeSlot);
         appointment.setStartTime(timeSlot.getStartTime());
         appointment.setEndTime(timeSlot.getEndTime());
-
-        if (user != null) {
-            appointment.setUser(user);
-        }
+        appointment.setUser(actor);
 
         appointment.setCancellationToken(UUID.randomUUID().toString());
 
         Appointment saved = appointmentRepository.save(appointment);
         scheduleConfirmationEmail(saved);
         return saved;
-    }
-
-    @Override
-    public List<Appointment> getAppointmentsVisibleTo(String username) {
-        User actor = requireUser(username);
-        if (isAdmin(actor)) {
-            return appointmentRepository.findAll();
-        }
-        return appointmentRepository.findByUserId(actor.getId());
-    }
-
-    @Override
-    public Optional<Appointment> getAppointmentForUser(Long id, String username) {
-        User actor = requireUser(username);
-        return appointmentRepository.findById(id).filter(appointment -> canManage(appointment, actor));
     }
 
     @Override
@@ -164,7 +156,7 @@ public class AppointmentServiceImpl implements AppointmentService {
     }
 
     private static boolean isAdmin(User user) {
-        return user.getRole() != null && "ADMIN".equalsIgnoreCase(user.getRole());
+        return "ADMIN".equalsIgnoreCase(user.getRole());
     }
 
     private static boolean canManage(Appointment appointment, User actor) {

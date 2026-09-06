@@ -5,6 +5,7 @@ import com.example.booking.model.TimeSlot;
 import com.example.booking.model.User;
 import com.example.booking.repository.AppointmentRepository;
 import com.example.booking.repository.TimeSlotRepository;
+import com.example.booking.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -36,6 +37,9 @@ public class ConcurrentBookingTest {
     @Autowired
     private AppointmentRepository appointmentRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
     /**
      * This test simulates 10 concurrent users trying to book the same time slot.
      * With the atomic update implementation, only ONE should succeed.
@@ -49,6 +53,7 @@ public class ConcurrentBookingTest {
         timeSlot.setAvailable(true);
         TimeSlot savedSlot = timeSlotRepository.save(timeSlot);
         Long timeSlotId = savedSlot.getId();
+        User booker = saveUser("concurrent-booker", "concurrent-booker@test.com");
 
         // Test: Launch 10 concurrent booking attempts
         int numThreads = 10;
@@ -68,7 +73,7 @@ public class ConcurrentBookingTest {
                     appointment.setLocation("Test Location");
                     appointment.setService("Test Service");
 
-                    appointmentService.bookAppointment(appointment, timeSlotId, null);
+                    appointmentService.bookAppointment(appointment, timeSlotId, booker);
                     successCount.incrementAndGet();
                     System.out.println("✓ User " + userId + " successfully booked the slot");
                 } catch (com.example.booking.exception.ConflictException | IllegalStateException e) {
@@ -117,7 +122,7 @@ public class ConcurrentBookingTest {
         appointment.setCustomerPhone("555-0000");
 
         assertThrows(IllegalArgumentException.class, () -> {
-            appointmentService.bookAppointment(appointment, 99999L, null);
+            appointmentService.bookAppointment(appointment, 99999L, saveUser("missing-slot-user", "missing-slot@test.com"));
         }, "Booking non-existent slot should throw IllegalArgumentException");
     }
 
@@ -140,7 +145,18 @@ public class ConcurrentBookingTest {
         appointment.setCustomerPhone("555-0000");
 
         assertThrows(com.example.booking.exception.ConflictException.class, () -> {
-            appointmentService.bookAppointment(appointment, savedSlot.getId(), null);
+            appointmentService.bookAppointment(appointment, savedSlot.getId(),
+                    saveUser("unavailable-slot-user", "unavailable-slot@test.com"));
         }, "Booking unavailable slot should throw ConflictException");
+    }
+
+    private User saveUser(String username, String email) {
+        User user = new User();
+        user.setUsername(username);
+        user.setPassword("secret");
+        user.setEmail(email);
+        user.setPhone("555-0000");
+        user.setRole("USER");
+        return userRepository.save(user);
     }
 }

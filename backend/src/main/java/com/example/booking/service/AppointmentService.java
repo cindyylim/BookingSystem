@@ -11,13 +11,9 @@ import java.util.Optional;
 public interface AppointmentService {
     List<Appointment> getAllAppointments();
 
-    List<Appointment> getAppointmentsForUser(Long userId);
-
     List<Appointment> getAppointmentsVisibleTo(String username);
 
     UserAppointmentsResponse getUpcomingAndHistoryForUser(Long userId);
-
-    Optional<Appointment> getAppointment(Long id);
 
     Optional<Appointment> getAppointmentForUser(Long id, String username);
 

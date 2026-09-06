@@ -43,5 +43,6 @@ class DataInitializerTest {
         dataInitializer.run();
 
         verify(userService).createUser(any(User.class));
+        verify(passwordEncoder).encode("admin123");
     }
 }

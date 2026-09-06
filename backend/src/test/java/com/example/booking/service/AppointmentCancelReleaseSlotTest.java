@@ -2,8 +2,10 @@ package com.example.booking.service;
 
 import com.example.booking.model.Appointment;
 import com.example.booking.model.TimeSlot;
+import com.example.booking.model.User;
 import com.example.booking.repository.AppointmentRepository;
 import com.example.booking.repository.TimeSlotRepository;
+import com.example.booking.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -27,6 +29,9 @@ class AppointmentCancelReleaseSlotTest {
     @Autowired
     private AppointmentRepository appointmentRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
     @Test
     void cancelAppointment_MarksSlotAvailableAgain() {
         OffsetDateTime start = OffsetDateTime.now(ZoneOffset.UTC).plusDays(40).withNano(0);
@@ -43,12 +48,23 @@ class AppointmentCancelReleaseSlotTest {
         appointment.setLocation("Office");
         appointment.setService("Consult");
 
-        Appointment saved = appointmentService.bookAppointment(appointment, slot.getId(), null);
+        Appointment saved = appointmentService.bookAppointment(appointment, slot.getId(),
+                saveUser("cancel-user", "cancel@test.com"));
         assertFalse(timeSlotRepository.findById(slot.getId()).orElseThrow().isAvailable());
 
         appointmentService.cancelAppointmentByToken(saved.getCancellationToken());
 
         assertTrue(appointmentRepository.findById(saved.getId()).isEmpty());
         assertTrue(timeSlotRepository.findById(slot.getId()).orElseThrow().isAvailable());
+    }
+
+    private User saveUser(String username, String email) {
+        User user = new User();
+        user.setUsername(username);
+        user.setPassword("secret");
+        user.setEmail(email);
+        user.setPhone("555-0100");
+        user.setRole("USER");
+        return userRepository.save(user);
     }
 }

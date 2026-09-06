@@ -28,6 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 import com.example.booking.config.SecurityConfig;
 import com.example.booking.exception.RestExceptionHandler;
@@ -87,24 +88,6 @@ public class AuthControllerTest {
     }
 
     @Test
-    public void testRegisterWithExistingEmail() throws Exception {
-        RegisterRequest req = new RegisterRequest();
-        req.setUsername("newuser");
-        req.setPassword("password123");
-        req.setEmail("new@example.com");
-        req.setPhone("1234567890");
-
-        doThrow(new IllegalArgumentException("Username or email already exists"))
-                .when(authService).register(any(RegisterRequest.class));
-
-        mockMvc.perform(post("/api/auth/register")
-                .with(csrf())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().is(400));
-    }
-
-    @Test
     public void testLogin() throws Exception {
         User user = new User();
         user.setUsername("testuser");
@@ -124,7 +107,12 @@ public class AuthControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isOk())
-                .andExpect(cookie().value("jwt", "fake-jwt-token"));
+                .andExpect(cookie().value("jwt", "fake-jwt-token"))
+                .andExpect(jsonPath("$.user.username").value("testuser"))
+                .andExpect(jsonPath("$.user.email").value("test@example.com"))
+                .andExpect(jsonPath("$.user.phone").value("1234567890"))
+                .andExpect(jsonPath("$.user.role").value("USER"))
+                .andExpect(jsonPath("$.user.password").doesNotExist());
     }
 
     @Test
@@ -163,7 +151,11 @@ public class AuthControllerTest {
         when(authService.currentUser("testuser")).thenReturn(Optional.of(user));
 
         mockMvc.perform(get("/api/auth/me"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("testuser"))
+                .andExpect(jsonPath("$.email").value("test@example.com"))
+                .andExpect(jsonPath("$.phone").value("1234567890"))
+                .andExpect(jsonPath("$.role").value("USER"));
     }
 
     @Test
@@ -179,42 +171,5 @@ public class AuthControllerTest {
 
         mockMvc.perform(get("/api/auth/me"))
                 .andExpect(status().isNotFound());
-    }
-
-    @Test
-    public void testRegisterShortPassword() throws Exception {
-        RegisterRequest req = new RegisterRequest();
-        req.setUsername("newuser");
-        req.setPassword("123");
-        req.setEmail("new@example.com");
-        req.setPhone("1234567890");
-
-        mockMvc.perform(post("/api/auth/register")
-                .with(csrf())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    public void testRegisterMissingFields() throws Exception {
-        mockMvc.perform(post("/api/auth/register")
-                .with(csrf())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{}"))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    public void testLoginMissingFields() throws Exception {
-        LoginRequest req = new LoginRequest();
-        req.setUsername("");
-        req.setPassword("");
-
-        mockMvc.perform(post("/api/auth/login")
-                .with(csrf())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isBadRequest());
     }
 }

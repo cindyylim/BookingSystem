@@ -47,10 +47,12 @@ class AppointmentRepositoryTest {
 
     @Test
     void existsByTimeSlotId() {
+        User user = saveUser("repo-user", "repo-user@example.com");
+
         TimeSlot slot = saveSlot(OffsetDateTime.now().plusDays(3));
         assertFalse(appointmentRepository.existsByTimeSlot_Id(slot.getId()));
 
-        appointmentRepository.save(baseAppointment("slot-tok", null, slot));
+        appointmentRepository.save(baseAppointment("slot-tok", user, slot));
         assertTrue(appointmentRepository.existsByTimeSlot_Id(slot.getId()));
     }
 
@@ -74,9 +76,9 @@ class AppointmentRepositoryTest {
 
     private Appointment baseAppointment(String token, User user, TimeSlot slot) {
         Appointment appointment = new Appointment();
-        appointment.setCustomerName("Pat");
-        appointment.setCustomerEmail("pat@example.com");
-        appointment.setCustomerPhone("5550001111");
+        appointment.setCustomerName("John Doe");
+        appointment.setCustomerEmail("john@example.com");
+        appointment.setCustomerPhone("555-1234");
         appointment.setCancellationToken(token);
         appointment.setService("Cut");
         appointment.setLocation("Main");

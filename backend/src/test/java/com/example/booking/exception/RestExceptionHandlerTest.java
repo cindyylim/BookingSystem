@@ -19,6 +19,58 @@ class RestExceptionHandlerTest {
     private final RestExceptionHandler handler = new RestExceptionHandler();
 
     @Test
+    void resourceNotFoundReturns404() {
+        ResponseEntity<Map<String, String>> response = handler.handleNotFound(
+                new ResourceNotFoundException("TimeSlot not found"));
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertEquals("TimeSlot not found", response.getBody().get("message"));
+        assertEquals("TimeSlot not found", response.getBody().get("error"));
+    }
+
+    @Test
+    void conflictReturns409() {
+        ResponseEntity<Object> response = handler.handleConflict(
+                new ConflictException("Time slot is not available"));
+
+        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        @SuppressWarnings("unchecked")
+        Map<String, String> body = (Map<String, String>) response.getBody();
+        assertEquals("Time slot is not available", body.get("message"));
+        assertEquals("Time slot is not available", body.get("error"));
+    }
+
+    @Test
+    void unauthorizedReturns401() {
+        ResponseEntity<Map<String, String>> response = handler.handleUnauthorized(
+                new UnauthorizedException("Invalid credentials"));
+
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        assertEquals("Invalid credentials", response.getBody().get("message"));
+        assertEquals("Invalid credentials", response.getBody().get("error"));
+    }
+
+    @Test
+    void illegalArgumentExceptionReturns400() {
+        ResponseEntity<Map<String, String>> response = handler.handleBadRequest(
+                new IllegalArgumentException("Time slot overlaps with an existing slot."));
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertEquals("Time slot overlaps with an existing slot.", response.getBody().get("message"));
+        assertEquals("Time slot overlaps with an existing slot.", response.getBody().get("error"));
+    }
+
+    @Test
+    void illegalArgumentExceptionWithoutMessageUsesFallback() {
+        ResponseEntity<Map<String, String>> response = handler.handleBadRequest(
+                new IllegalArgumentException((String) null));
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertEquals("Bad request", response.getBody().get("message"));
+        assertEquals("Bad request", response.getBody().get("error"));
+    }
+
+    @Test
     void dateTimeParseExceptionReturns400() {
         ResponseEntity<Map<String, String>> response = handler.handleBadRequest(
                 new DateTimeParseException("bad", "x", 0));

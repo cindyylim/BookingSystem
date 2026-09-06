@@ -4,10 +4,12 @@ import com.example.booking.dto.TimeSlotRequest;
 import com.example.booking.exception.ConflictException;
 import com.example.booking.exception.ResourceNotFoundException;
 import com.example.booking.model.TimeSlot;
+import com.example.booking.model.Appointment;
 import com.example.booking.security.JwtService;
 import com.example.booking.service.TimeSlotService;
 import com.example.booking.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -54,35 +56,85 @@ public class TimeSlotControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @Test
-    public void testGetAllTimeSlots() throws Exception {
-        TimeSlot slot = new TimeSlot();
+    private TimeSlot slot;
+
+    @BeforeEach
+    void setUp() {
+        slot = new TimeSlot();
         slot.setId(1L);
         slot.setStartTime(OffsetDateTime.parse("2024-01-01T10:00:00Z"));
         slot.setEndTime(OffsetDateTime.parse("2024-01-01T11:00:00Z"));
         slot.setAvailable(true);
-        slot.setAppointments(java.util.Collections.emptyList());
+        Appointment appointment = new Appointment();
+        appointment.setId(1L);
+        appointment.setService("Service 1");
+        appointment.setCustomerName("Client 1");
+        appointment.setCustomerEmail("client1@example.com");
+        appointment.setCustomerPhone("1234567890");
+        appointment.setLocation("123 Main St");
+        slot.setAppointments(List.of(appointment));
+    }
 
+    @Test
+    public void testGetAllTimeSlots() throws Exception {
         when(timeSlotService.getAvailableTimeSlots()).thenReturn(List.of(slot));
 
         mockMvc.perform(get("/api/timeslots"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(1));
+                .andExpect(jsonPath("$[0].id").value(1))
+                .andExpect(jsonPath("$[0].appointments").isEmpty())
+                .andExpect(jsonPath("$[0].available").value(true))
+                .andExpect(jsonPath("$[0].startTime").value("2024-01-01T10:00:00Z"))
+                .andExpect(jsonPath("$[0].endTime").value("2024-01-01T11:00:00Z"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    public void testAdminGetAllTimeSlotsIncludesService() throws Exception {
+        when(timeSlotService.getAllTimeSlots()).thenReturn(List.of(slot));
+
+        mockMvc.perform(get("/api/timeslots"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(1))
+                .andExpect(jsonPath("$[0].appointments").isArray()).andExpect(jsonPath("$[0].appointments[0].service").value("Service 1"))
+                .andExpect(jsonPath("$[0].appointments[0].clientName").value("Client 1"))
+                .andExpect(jsonPath("$[0].appointments[0].clientEmail").value("client1@example.com"))
+                .andExpect(jsonPath("$[0].appointments[0].clientPhone").value("1234567890"))
+                .andExpect(jsonPath("$[0].appointments[0].location").value("123 Main St"))
+                .andExpect(jsonPath("$[0].available").value(true))
+                .andExpect(jsonPath("$[0].startTime").value("2024-01-01T10:00:00Z"))
+                .andExpect(jsonPath("$[0].endTime").value("2024-01-01T11:00:00Z"));
     }
 
     @Test
     public void testGetTimeSlot() throws Exception {
-        TimeSlot slot = new TimeSlot();
-        slot.setId(1L);
-        slot.setStartTime(OffsetDateTime.parse("2024-01-01T10:00:00Z"));
-        slot.setEndTime(OffsetDateTime.parse("2024-01-01T11:00:00Z"));
-        slot.setAppointments(java.util.Collections.emptyList());
-
         when(timeSlotService.getTimeSlot(1L)).thenReturn(Optional.of(slot));
 
         mockMvc.perform(get("/api/timeslots/1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(1));
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.appointments").isEmpty())
+                .andExpect(jsonPath("$.available").value(true))
+                .andExpect(jsonPath("$.startTime").value("2024-01-01T10:00:00Z"))
+                .andExpect(jsonPath("$.endTime").value("2024-01-01T11:00:00Z"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    public void testAdminGetTimeSlotIncludesService() throws Exception {
+        when(timeSlotService.getTimeSlot(1L)).thenReturn(Optional.of(slot));
+
+        mockMvc.perform(get("/api/timeslots/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.appointments").isArray()).andExpect(jsonPath("$.appointments[0].service").value("Service 1"))
+                .andExpect(jsonPath("$.appointments[0].clientName").value("Client 1"))
+                .andExpect(jsonPath("$.appointments[0].clientEmail").value("client1@example.com"))
+                .andExpect(jsonPath("$.appointments[0].clientPhone").value("1234567890"))
+                .andExpect(jsonPath("$.appointments[0].location").value("123 Main St"))
+                .andExpect(jsonPath("$.available").value(true))
+                .andExpect(jsonPath("$.startTime").value("2024-01-01T10:00:00Z"))
+                .andExpect(jsonPath("$.endTime").value("2024-01-01T11:00:00Z"));
     }
 
     @Test
@@ -270,19 +322,5 @@ public class TimeSlotControllerTest {
                 .andExpect(status().isForbidden());
     }
 
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    public void testAdminGetAllTimeSlotsIncludesService() throws Exception {
-        TimeSlot slot = new TimeSlot();
-        slot.setId(1L);
-        slot.setStartTime(OffsetDateTime.parse("2024-01-01T10:00:00Z"));
-        slot.setEndTime(OffsetDateTime.parse("2024-01-01T11:00:00Z"));
-        slot.setAvailable(true);
-        slot.setAppointments(java.util.Collections.emptyList());
-        when(timeSlotService.getAllTimeSlots()).thenReturn(List.of(slot));
 
-        mockMvc.perform(get("/api/timeslots"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(1));
-    }
 }

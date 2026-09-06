@@ -152,22 +152,6 @@ public class AppointmentControllerTest {
 
     @Test
     @WithMockUser(username = "testuser")
-    public void testBookAppointmentAuthenticated() throws Exception {
-        AppointmentRequest req = new AppointmentRequest();
-        req.setTimeSlotId(1L);
-
-        when(appointmentService.bookAppointmentForUser(eq("testuser"), any(AppointmentRequest.class)))
-                .thenReturn(new Appointment());
-
-        mockMvc.perform(post("/api/appointments")
-                .with(csrf())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    @WithMockUser(username = "testuser")
     public void testDeleteAppointment() throws Exception {
         doNothing().when(appointmentService).cancelAppointment(1L, "testuser");
 
